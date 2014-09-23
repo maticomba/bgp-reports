@@ -1,8 +1,10 @@
-# To change this license header, choose License Headers in Project Properties.
-# To change this template file, choose Tools | Templates
-# and open the template in the editor.
+# TODO Interpretar los archivos json y poder extraer datos
+# TODO Reutilizar los parseCisco y parseMRT en los chequeos de IXP
+# TODO Generar los graficos
+# TODO Armar una funcion que arme carpetas si estas no existen
+# TODO Armar una funcion que agrupe archivos json y temporales en muchas subcarpetas por los limites de los filesystems
 
-__author__="a.weher"
+__author__="Ariel Weher y Matias Comba"
 __date__ ="$Sep 1, 2014 7:39:33 AM$"
 
 import ConfigParser
@@ -518,22 +520,23 @@ def generar_faltantes(CONFIG,PAIS):
     f.close()
     
     ASNsFaltantesEnElIXP = ASNsGlobales - ASNsIXP
+    noestanenelixp=list()
+    
+    for item in ASNsFaltantesEnElIXP:
+        noestanenelixp.append(item)
+    noestanenelixp.sort()    
     datoswhois = rdapwhois(CONFIG,ASNsFaltantesEnElIXP)
     print('ASNs publicados al mundo que faltan en el IXP de '+PAIS+': '+str(len(ASNsFaltantesEnElIXP)))
     
-    for faltante in ASNsFaltantesEnElIXP:
+    for faltante in noestanenelixp:
         try:
             with open(CONFIG['json_folder']+faltante+'.json','r') as j:
                 jdata = json.load(j)
-                json_string = json.dumps(j,sort_keys=True,indent=2)
-                print json_string
-                parent =  j["vcardArray"]
-                for item in parent:
-                    print item["fn"]
-                    print item["email"]
-                print('\t --> AS'+faltante)
+                print('\t --> AS'+faltante+' '+jdata['entities'][0]['vcardArray'][1][5][3][0].encode('utf-8'))
+                print('\t\t Tecnico: '+jdata['entities'][2]['vcardArray'][1][1][3].encode('utf-8'))
+                print('\t\t Email: <'+jdata['entities'][2]['vcardArray'][1][3][3].lower()+'>')
         except IOError as e:
-            print('Error en el archivo JSON del ASN '+str(faltante))
+            print('\t --> [RDAP-Bug] Error al leer el JSON de AS'+str(faltante))
 
 def parseMRT(bgpfile):
     """Devuelve dos conjuntos desde un dump BGP"""
