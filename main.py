@@ -14,7 +14,7 @@ def cidrsOverlap(cidr0, cidr1):
 if __name__ == "__main__":
     import asn
     import asnutils
-    from netaddr import IPNetwork, IPAddress
+#    from netaddr import IPNetwork, IPAddress
     
 
 # Por el bug del sistema Restful de LACNIC
@@ -40,16 +40,16 @@ if __name__ == "__main__":
     CONFIG['deleg_ripencc']=CONFIG['feed_dir']+'delegated-ripencc-latest'
     CONFIG['deleg_lacnic']=CONFIG['feed_dir']+'delegated-lacnic-latest'
     CONFIG['deleg_afrinic']=CONFIG['feed_dir']+'delegated-afrinic-latest'
-    CONFIG['deleg_arin_url']='http://localhost/delegated-arin-latest'
-    CONFIG['deleg_apnic_url']='http://localhost/delegated-apnic-latest'
-    CONFIG['deleg_ripencc_url']='http://localhost/delegated-ripencc-latest'
-    CONFIG['deleg_lacnic_url']='http://localhost/delegated-lacnic-latest'
-    CONFIG['deleg_afrinic_url']='http://localhost/delegated-afrinic-latest'
-#    CONFIG['deleg_arin_url']='ftp://ftp.apnic.net/pub/stats/arin/delegated-arin-extended-latest'
-#    CONFIG['deleg_apnic_url']='ftp://ftp.apnic.net/pub/stats/apnic/delegated-apnic-latest'
-#    CONFIG['deleg_ripencc_url']='ftp://ftp.ripe.net/ripe/stats/delegated-ripencc-latest'
-#    CONFIG['deleg_lacnic_url']='ftp://ftp.lacnic.net/pub/stats/lacnic/delegated-lacnic-latest'
-#    CONFIG['deleg_afrinic_url']='ftp://ftp.apnic.net/pub/stats/afrinic/delegated-afrinic-latest'
+#    CONFIG['deleg_arin_url']='http://localhost/delegated-arin-latest'
+#    CONFIG['deleg_apnic_url']='http://localhost/delegated-apnic-latest'
+#    CONFIG['deleg_ripencc_url']='http://localhost/delegated-ripencc-latest'
+#    CONFIG['deleg_lacnic_url']='http://localhost/delegated-lacnic-latest'
+#    CONFIG['deleg_afrinic_url']='http://localhost/delegated-afrinic-latest'
+    CONFIG['deleg_arin_url']='ftp://ftp.apnic.net/pub/stats/arin/delegated-arin-extended-latest'
+    CONFIG['deleg_apnic_url']='ftp://ftp.apnic.net/pub/stats/apnic/delegated-apnic-latest'
+    CONFIG['deleg_ripencc_url']='ftp://ftp.ripe.net/ripe/stats/delegated-ripencc-latest'
+    CONFIG['deleg_lacnic_url']='ftp://ftp.lacnic.net/pub/stats/lacnic/delegated-lacnic-latest'
+    CONFIG['deleg_afrinic_url']='ftp://ftp.apnic.net/pub/stats/afrinic/delegated-afrinic-latest'
     CONFIG['main_feed']=CONFIG['json_folder']+'main_feed.json'
     #
     #CONFIG['tablaixp']['AR'] = CONFIG['feed_dir']
@@ -61,10 +61,9 @@ if __name__ == "__main__":
 
     asnutils.actualizar_feeds(CONFIG)
     asnutils.parse_asn_rir(CONFIG)
-    
     asnutils.generar_reporte_global(CONFIG)
     
-    for PAIS in ['AR']:
+    for PAIS in ['AR','CL']:
         asnutils.generar_reporte_ixp(CONFIG,PAIS,RecursosRIR)
         asnutils.generar_reporte_pais(CONFIG,PAIS)
         asnutils.generar_faltantes(CONFIG,PAIS)

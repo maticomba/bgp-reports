@@ -7,6 +7,8 @@ __date__ ="$Sep 1, 2014 7:39:33 AM$"
 
 import ConfigParser
 import json
+import simplejson
+import pprint
 import os
 import urllib2
 import csv
@@ -26,9 +28,12 @@ def colorprint(color,txt):
     }
     print colores[color]+txt+'\x1b[00m'
 
-def generar_reporte_global(CONFIG):
-    """ Genera reportes de todos los ASN y links de la tabla mundial"""    
-    generar = False
+def generar_reporte_global(CONFIG,force=False):
+    """ Genera reportes de todos los ASN y links de la tabla mundial"""
+    if (force == False):
+        generar = False
+    else:
+        generar = True
 # Veo si existen los archivos preprocesados y los leo
     if (os.path.isfile(CONFIG['tmp_folder']+"RPT_ASNsGlobal") and os.path.isfile(CONFIG['tmp_folder']+"RPT_LinksGlobal")):
         if ((os.stat(CONFIG['tmp_folder']+"RPT_ASNsGlobal").st_size > 0) and (os.stat(CONFIG['tmp_folder']+"RPT_LinksGlobal").st_size > 0)):
@@ -261,6 +266,7 @@ def find_rir_by_country(CONFIG,country):
     RIRs = ['ARIN','RIPENCC','APNIC','LACNIC','AFRINIC']
     
     for rir in RIRs:
+        # TODO
         # 1 abrir delegaciones
         # 2 procesar buscando Pais
         # 3 devolver resultados unicos
@@ -297,82 +303,48 @@ def make_asn_pais(archivo):
     return([ListaDeASNdelPais,PaisDelASN])
 
 def make_asn_links(bgpdump):
-  """[NEEDFIX] Devuelve dos conjuntos desde un dump BGP"""
-  ListaASNs=[]
-  ListaLinks=[]
-
-  StartofASPath=0
-  with open(bgpdump) as dumpbgp:
-    for line in dumpbgp:
-      line=line.rstrip('\r\n') #Caro me paso estos caracteres en el dump de CL
-      StartofASPath=line.find("Path") #busco la columna donde diga Path
-      if StartofASPath > 40 :
-        break
-    if StartofASPath<40:
-      print("Error en archivo BGP - Falta texto Path antes de la columna 40 en:",bgpdump)
-      exit
-
-    for line in dumpbgp:
-        aspath=line[StartofASPath:-2] # saco todos los AS separados por un " "
-        CountAS=1
-        as0=''
-#        ListaASNs=set()
-        while aspath:
-            as1,separador,aspath=aspath.partition(" ")
-            if len(as1) > 0:
-                if as1.isalnum(): # si es alfa numerico
-                    ListaASNs+=[as1]
-                    if CountAS > 1:
-                        if(as0 != as1 ): # para evitar que un prepend se tome como un link
-                            ListaLinks+=[as0+","+as1]
-                    print (aspath)                    
-                    print(as0 + '|' + as1)
-                    print(' ')
-                    as0=as1
-                    CountAS+=1
-#                elif as1[0]=='{': #es un as-set
-#                    otroAspath=as1[1:-1] #saca las llaves (que a veces parecen corchetes)
-#                    as1,separador,otroAspath.partition(",")
-#                    as0 = as1
-#                    while otroAspath:
-#                        as1,separador,otroAspath=otroAspath.partition(",")
-#                        if as1.isalnum():
-#                            ListaASNs+=[as1]
-#                            if(as0 != as1 ):
-#                                ListaLinks+=[as0+","+as1]
-#                        else:
-#                            print ("Warning-AS-Set parse error: ",line)
-                else:
-                    print ("Warning-AS Path parse error: ",line)
-            else:
-                print('as1: "'+as1+'"')
-#Utiliza listas en lugar de Conjuntos por el tiempo de procesamiento
-# L.add es de O(1) y L|= es de O(n)
+    """[NEEDFIX] Devuelve dos conjuntos desde un dump BGP"""
+    ListaASNs=[]
+    ListaLinks=[]
+    try:
+        fileinfo=os.stat(bgpdump)
+    except OSError as e:
+        print('Error al acceder al archivo '+bgpdump+': '+str(e))
+        return False
+    
+    dumptype = ribtype(bgpdump)
+    
+    if (dumptype == 'cisco'):
+        ListaASNs,ListaLinks = parseCisco(bgpdump)
+        
+    if (dumptype == 'mrt'):
+        ListaASNs,ListaLinks = parseMRT(bgpdump)
+    
     return([set(ListaASNs), set(ListaLinks)])
 
 def rdapwhois(CONFIG,ASNs):
     cachedir=CONFIG['json_folder']
     RDAPurl = dict()
     RDAPurl['LACNIC'] = 'http://restfulwhoisv2.labs.lacnic.net/restfulwhois/autnum/'
-    RDAPurl['RIPE'] = 'http://rest.db.ripe.net/search.json?query-string=as'
+    RDAPurl['RIPENCC'] = 'http://rest.db.ripe.net/search.json?query-string=as'
     RDAPurl['ARIN'] = 'http://whois.arin.net/rest/asn/AS'
     RDAPurl['AFRINIC'] = 'http://rest.db.ripe.net/search.json?query-string=as' #el de ripe parece que sirve
-    RDAPurl['APNIC'] = RDAPurl['RIPE'] # Todavia no esta implementada la busqueda de ASN, solo IPs: http://www.apnic.net/apnic-info/whois_search/about/rdap
-    RDAP404=Set()
+    RDAPurl['APNIC'] = RDAPurl['RIPENCC'] # Todavia no esta implementada la busqueda de ASN, solo IPs: http://www.apnic.net/apnic-info/whois_search/about/rdap
+    RDAP404=set()
+    DatosWHOIS=dict()
     
     try:
         fileinfo=os.stat(cachedir)
     except OSError as e:
         os.mkdir(cachedir)
     
-    if (not RDAPurl[rir]):
-        print('No hay informacion de servidor RDAP para el RIR: '+rir)
-        return
-    
     for asn in ASNs:
         rir=find_rir_by_asn(CONFIG,asn)
         if (rir == 'SPECIAL'):
             next
+        if (not RDAPurl[rir.upper()]):
+            print('No hay informacion de servidor RDAP para el RIR: '+rir)
+            return
         url=RDAPurl[rir]+str(asn)
         archivo=cachedir+str(asn)+'.json'
         
@@ -386,11 +358,68 @@ def rdapwhois(CONFIG,ASNs):
                     print('Error en el archivo '+archivo+': ',e)
                 continue
         except OSError as e:
-            print('No puedo acceder al archivo: '+archivo)
+            elerror=e
+            
     
     try:
         request = urllib2.Request(url, headers={'Accept': 'application/json'})
-        f = urllib.urlopen(request)
+        f = urllib2.urlopen(request)
+    except urllib2.HTTPError as e:
+        RDAP404.add(asn)
+    else:
+        w=open(archivo,'w')
+        DatosWHOIS[asn]=f.read()
+        try:
+            w.write(DatosWHOIS[asn])
+        except OSError as e:
+            print('Error en el archivo '+archivo+': ',e)
+        f.close()
+        w.close()
+    
+    if (len(RDAP404) > 0):
+        print('Se encontraron errores en las consultas RDAP para los siguientes ASNs:'+str(RDAP404))
+        
+    return(DatosWHOIS)
+
+def whois(CONFIG,ASNs,rir):
+    cachedir=CONFIG['json_folder']
+    RDAPurl = dict()
+    RDAPurl['LACNIC'] = 'http://restfulwhoisv2.labs.lacnic.net/restfulwhois/autnum/'
+    RDAPurl['RIPENCC'] = 'http://rest.db.ripe.net/search.json?query-string=as'
+    RDAPurl['ARIN'] = 'http://whois.arin.net/rest/asn/AS'
+    RDAPurl['AFRINIC'] = 'http://rest.db.ripe.net/search.json?query-string=as' #el de ripe parece que sirve
+    RDAPurl['APNIC'] = RDAPurl['RIPENCC'] # Todavia no esta implementada la busqueda de ASN, solo IPs: http://www.apnic.net/apnic-info/whois_search/about/rdap
+    RDAP404=set()
+    DatosWHOIS=dict()
+    
+    try:
+        fileinfo=os.stat(cachedir)
+    except OSError as e:
+        os.mkdir(cachedir)
+    
+    for asn in ASNs:        
+        if (not RDAPurl[rir.upper()]):
+            print('No hay informacion de servidor RDAP para el RIR: '+rir)
+            return
+        url=RDAPurl[rir]+str(asn)
+        archivo=cachedir+str(asn)+'.json'
+        
+        try:
+            statinfo=os.stat(archivo)
+            if(statinfo.st_size>1000):
+                w=open(archivo,'r')
+                try:
+                    DatosWHOIS[asn]=json.loads(w.read())
+                except ValueError, e:
+                    print('Error en el archivo '+archivo+': ',e)
+                continue
+        except OSError as e:
+            print('No puedo acceder al archivo: '+archivo+', lo consulto.')
+            time.sleep(1)
+    
+    try:
+        request = urllib2.Request(url, headers={'Accept': 'application/json'})
+        f = urllib2.urlopen(request)
     except urllib2.HTTPError as e:
         RDAP404.add(asn)
     else:
@@ -413,7 +442,7 @@ def actualizar_feeds(CONFIG):
     print('Verificando si hay archivos para descargar...')
     print("\t  * Delegaciones de los RIR")
     rehacer = True #False
-        
+    listadodeasn=set()
     for rir in ['arin','ripencc','apnic','lacnic','afrinic']:
         url=CONFIG['deleg_'+rir+'_url']
         archivo=CONFIG['deleg_'+rir]
@@ -455,15 +484,19 @@ def actualizar_feeds(CONFIG):
             ipv6=dict()
             f = open(CONFIG['tmp_folder']+'delegaciones','r')
             contenido = f.readlines()
+            print('Chequeando CACHE de whois...')
             for linea in contenido:
                 linea.strip()
                 if re.search(r'asn',linea):
-                   datos = linea.split('|')
-                   rir = datos[0].strip()
-                   pais = datos[1].strip()
-                   tipo = datos[2].strip()
-                   asn = datos[3].strip()
-                   estado = datos[6].strip()
+                    datos = linea.split('|')
+                    rir = datos[0].strip()
+                    pais = datos[1].strip()
+                    tipo = datos[2].strip()
+                    asn = datos[3].strip()
+                    estado = datos[6].strip()
+                    listadodeasn.add(int(asn))
+#                    if(estado.lower()=='assigned' or estado.lower()=='allocated'):
+#                        pepe = whois(CONFIG,listadodeasn,rir.upper())
 ### FIXME                
 #            print(chuchuua)
             
@@ -485,13 +518,28 @@ def generar_faltantes(CONFIG,PAIS):
     f.close()
     
     ASNsFaltantesEnElIXP = ASNsGlobales - ASNsIXP
-    print('ASNs que faltan en '+PAIS+' ('+str(len(ASNsFaltantesEnElIXP))+'): '+str(ASNsFaltantesEnElIXP))
+    datoswhois = rdapwhois(CONFIG,ASNsFaltantesEnElIXP)
+    print('ASNs publicados al mundo que faltan en el IXP de '+PAIS+': '+str(len(ASNsFaltantesEnElIXP)))
+    
+    for faltante in ASNsFaltantesEnElIXP:
+        try:
+            with open(CONFIG['json_folder']+faltante+'.json','r') as j:
+                jdata = json.load(j)
+                json_string = json.dumps(j,sort_keys=True,indent=2)
+                print json_string
+                parent =  j["vcardArray"]
+                for item in parent:
+                    print item["fn"]
+                    print item["email"]
+                print('\t --> AS'+faltante)
+        except IOError as e:
+            print('Error en el archivo JSON del ASN '+str(faltante))
 
 def parseMRT(bgpfile):
     """Devuelve dos conjuntos desde un dump BGP"""
     ListaASNs=[]
     ListaLinks=[]
-    with open(bgpfile) as dump:
+    with open(bgpfile,'r') as dump:
         dumplines = dump.readlines()
         for linea in dumplines:
             linea = linea.strip()
@@ -516,7 +564,7 @@ def parseCisco(bgpfile):
     ListaASNs=[]
     ListaLinks=[]
     offset=0
-    with open(bgpfile) as dump:
+    with open(bgpfile,'r') as dump:
         dumplines = dump.readlines()
         while offset < 1:
             for linea in dumplines:
@@ -557,13 +605,16 @@ def txtxtract(texto,st,en):
     return str(buscado)
 
 def ribtype(archivo):
-    minhits=10
+    minhits=5
     chits=0
     mhits=0
+    lin=0
     try:
-        with open(archivo,'r') as rib:
-            contenido = archivo.readlines()
+        with open(archivo,'r') as dump:
+            contenido = dump.readlines()
+            totaldelineas=len(contenido)
             for linea in contenido:
+                lin+=1
                 linea = linea.strip()
                 if(chits >= minhits):
                     return 'cisco'
@@ -573,7 +624,8 @@ def ribtype(archivo):
                     chits+=1
                 if(re.search(r'^TYPE.*PREFIX.*ASPATH:.*',linea)):
                     mhits+=1
+                if(lin>minhits*4):
+                    return False
+                    break
     except IOError as e:
         print('No puedo abrir el archivo '+archivo+': '+e)
-        
-        
