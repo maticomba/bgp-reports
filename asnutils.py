@@ -1,7 +1,7 @@
-# TODO Interpretar los archivos json y poder extraer datos
 # TODO Reutilizar los parseCisco y parseMRT en los chequeos de IXP
 # TODO Generar los graficos
 # TODO Armar una funcion que arme carpetas si estas no existen
+# TODO Hacer que el update feeds baje la tabla MRT de RIPE
 # TODO Armar una funcion que agrupe archivos json y temporales en muchas subcarpetas por los limites de los filesystems
 
 __author__="Ariel Weher y Matias Comba"
@@ -9,8 +9,6 @@ __date__ ="$Sep 1, 2014 7:39:33 AM$"
 
 import ConfigParser
 import json
-import simplejson
-import pprint
 import os
 import urllib2
 import csv
@@ -257,10 +255,13 @@ def find_rir_by_asn(CONFIG,asnumber):
     """ Encuentra a que RIR hay que hacer la consulta de RDAP
         de acuerdo el numero de sistema autonomo de la clase """
     reservados=[0,23456]
+    reservados.append(range(64512,65535))
     if asnumber in reservados:
         return 'SPECIAL'
-    with open(CONFIG['tabla_asn_json'], 'rb') as archivo:
+    with open(CONFIG['tabla_asn_json'], 'r') as archivo:
         data = json.load(archivo)
+        if(data[asnumber]=='RIPE NCC'):
+            return 'RIPENCC'
         return (data[asnumber])
 
 def find_rir_by_country(CONFIG,country):
@@ -268,7 +269,7 @@ def find_rir_by_country(CONFIG,country):
     RIRs = ['ARIN','RIPENCC','APNIC','LACNIC','AFRINIC']
     
     for rir in RIRs:
-        # TODO
+        # TODO Implementar esta funcion
         # 1 abrir delegaciones
         # 2 procesar buscando Pais
         # 3 devolver resultados unicos
@@ -326,71 +327,62 @@ def make_asn_links(bgpdump):
 
 def rdapwhois(CONFIG,ASNs):
     cachedir=CONFIG['json_folder']
-    RDAPurl = dict()
-    RDAPurl['LACNIC'] = 'http://restfulwhoisv2.labs.lacnic.net/restfulwhois/autnum/'
-    RDAPurl['RIPENCC'] = 'http://rest.db.ripe.net/search.json?query-string=as'
-    RDAPurl['ARIN'] = 'http://whois.arin.net/rest/asn/AS'
-    RDAPurl['AFRINIC'] = 'http://rest.db.ripe.net/search.json?query-string=as' #el de ripe parece que sirve
-    RDAPurl['APNIC'] = RDAPurl['RIPENCC'] # Todavia no esta implementada la busqueda de ASN, solo IPs: http://www.apnic.net/apnic-info/whois_search/about/rdap
     RDAP404=set()
     DatosWHOIS=dict()
     
+    #Verifico que exista el directorio
     try:
         fileinfo=os.stat(cachedir)
     except OSError as e:
         os.mkdir(cachedir)
     
     for asn in ASNs:
+        # Busco a que rir pertenece el AS
         rir=find_rir_by_asn(CONFIG,asn)
         if (rir == 'SPECIAL'):
             next
-        if (not RDAPurl[rir.upper()]):
+        if (not CONFIG['rdap_'+rir.upper()]):
             print('No hay informacion de servidor RDAP para el RIR: '+rir)
             return
-        url=RDAPurl[rir]+str(asn)
+        url=CONFIG['rdap_'+rir]+str(asn)
         archivo=cachedir+str(asn)+'.json'
         
-        try:
+        try:            
             statinfo=os.stat(archivo)
-            if(statinfo.st_size>1000):
+            if(statinfo.st_size > 1000):
                 w=open(archivo,'r')
-                try:
-                    DatosWHOIS[asn]=json.loads(w.read())
-                except ValueError, e:
-                    print('Error en el archivo '+archivo+': ',e)
-                continue
-        except OSError as e:
-            elerror=e
-            
-    
-    try:
-        request = urllib2.Request(url, headers={'Accept': 'application/json'})
-        f = urllib2.urlopen(request)
-    except urllib2.HTTPError as e:
-        RDAP404.add(asn)
-    else:
-        w=open(archivo,'w')
-        DatosWHOIS[asn]=f.read()
-        try:
-            w.write(DatosWHOIS[asn])
-        except OSError as e:
-            print('Error en el archivo '+archivo+': ',e)
-        f.close()
-        w.close()
-    
-    if (len(RDAP404) > 0):
-        print('Se encontraron errores en las consultas RDAP para los siguientes ASNs:'+str(RDAP404))
-        
-    return(DatosWHOIS)
+                DatosWHOIS[asn]=json.loads(w.read())
+                w.close()
+#                print("Archivo: "+archivo + "| Tamanio: "+str(statinfo.st_size)+"\n")
+            else:
+                raise OSError('Archivo menor a 1000 bytes')
 
+        except OSError as e:            
+            try:
+                request = urllib2.Request(url, headers={'Accept': 'application/json'})
+                f = urllib2.urlopen(request)
+                w=open(archivo,'w')
+                DatosWHOIS[asn]=f.read()
+                w.write(DatosWHOIS[asn])
+                f.close()
+                w.close()
+                                
+            except OSError as e:
+                    print('Error al escribir en el archivo '+archivo+': ' + str(e))
+                
+            except urllib2.HTTPError as e:
+                RDAP404.add(asn)
+                print(str(e)+" ("+url+")")
+                
+            except Exception as e:
+                print('Error: '+str(e))
+
+    if (len(RDAP404) > 0):
+        print('Se encontraron errores en las consultas RDAP para los siguientes ASNs:'+str(RDAP404)+"\n")
+    return(DatosWHOIS)
+    
 def whois(CONFIG,ASNs,rir):
     cachedir=CONFIG['json_folder']
-    RDAPurl = dict()
-    RDAPurl['LACNIC'] = 'http://restfulwhoisv2.labs.lacnic.net/restfulwhois/autnum/'
-    RDAPurl['RIPENCC'] = 'http://rest.db.ripe.net/search.json?query-string=as'
-    RDAPurl['ARIN'] = 'http://whois.arin.net/rest/asn/AS'
-    RDAPurl['AFRINIC'] = 'http://rest.db.ripe.net/search.json?query-string=as' #el de ripe parece que sirve
-    RDAPurl['APNIC'] = RDAPurl['RIPENCC'] # Todavia no esta implementada la busqueda de ASN, solo IPs: http://www.apnic.net/apnic-info/whois_search/about/rdap
     RDAP404=set()
     DatosWHOIS=dict()
     
@@ -400,10 +392,10 @@ def whois(CONFIG,ASNs,rir):
         os.mkdir(cachedir)
     
     for asn in ASNs:        
-        if (not RDAPurl[rir.upper()]):
+        if (not CONFIG['rdap_'+rir.upper()]):
             print('No hay informacion de servidor RDAP para el RIR: '+rir)
             return
-        url=RDAPurl[rir]+str(asn)
+        url=CONFIG['rdap_'+rir]+str(asn)
         archivo=cachedir+str(asn)+'.json'
         
         try:
@@ -524,7 +516,8 @@ def generar_faltantes(CONFIG,PAIS):
     
     for item in ASNsFaltantesEnElIXP:
         noestanenelixp.append(item)
-    noestanenelixp.sort()    
+    noestanenelixp.sort()
+    
     datoswhois = rdapwhois(CONFIG,ASNsFaltantesEnElIXP)
     print('ASNs publicados al mundo que faltan en el IXP de '+PAIS+': '+str(len(ASNsFaltantesEnElIXP)))
     

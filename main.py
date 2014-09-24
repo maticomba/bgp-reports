@@ -50,8 +50,17 @@ if __name__ == "__main__":
     CONFIG['deleg_ripencc_url']='ftp://ftp.ripe.net/ripe/stats/delegated-ripencc-latest'
     CONFIG['deleg_lacnic_url']='ftp://ftp.lacnic.net/pub/stats/lacnic/delegated-lacnic-latest'
     CONFIG['deleg_afrinic_url']='ftp://ftp.apnic.net/pub/stats/afrinic/delegated-afrinic-latest'
+    
     CONFIG['main_feed']=CONFIG['json_folder']+'main_feed.json'
-    #
+    
+    CONFIG['rdap_ARIN']='http://whois.arin.net/rest/asn/AS'
+    CONFIG['rdap_RIPENCC']='http://rest.db.ripe.net/search.json?query-string=as'
+    CONFIG['rdap_APNIC']=CONFIG['rdap_RIPENCC'] # Todavia no esta implementada la busqueda de ASN, solo IPs: http://www.apnic.net/apnic-info/whois_search/about/rdap
+    CONFIG['rdap_LACNIC']='http://rdap.labs.lacnic.net/rdap/autnum/'
+    #CONFIG['rdap_LACNIC'] = 'http://restfulwhoisv2.labs.lacnic.net/restfulwhois/autnum/'
+    CONFIG['rdap_AFRINIC']=CONFIG['rdap_RIPENCC'] #aun no desarrollado, parece que sirve el de ripe igual
+    
+    
     #CONFIG['tablaixp']['AR'] = CONFIG['feed_dir']
     
     RecursosRIR = dict()
