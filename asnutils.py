@@ -7,7 +7,7 @@
 __author__="Ariel Weher y Matias Comba"
 __date__ ="$Sep 1, 2014 7:39:33 AM$"
 
-import ConfigParser
+#TODO import ConfigParser
 import json
 import os
 import urllib2
@@ -77,6 +77,7 @@ def generar_reporte_pais(CONFIG,PAIS):
             Upstream[as1]|={as0}
         else:
             Upstream[as1]={as0}
+#TODO Algunos ASNs aparecen como upstreams de si mismo (11815)
             
         if ((as0 in DicRIR[PAIS]) or (as1 in DicRIR[PAIS])):
             ASNs_BORDER+=[as0,as1]
@@ -86,6 +87,8 @@ def generar_reporte_pais(CONFIG,PAIS):
     f.write(repr(ASNs_BORDER))
     f=open(CONFIG['tmp_folder']+"RPT_Links_bgp-ixp-"+PAIS,"w")
     f.write(repr(Links_Pais))
+    f=open(CONFIG['tmp_folder']+'RPT_Upstreams_'+PAIS,'w')
+    f.write(repr(Upstream))
     
     PaisGL = DicRIR[PAIS] & ASNsGlobales
     
@@ -139,8 +142,8 @@ def olderthan(file,ttl=86400*7):
         return True
 
 def parse_asn_rir(CONFIG):
-    asn16csv = 'http://www.iana.org/assignments/as-numbers/as-numbers-1.csv'
-    asn32csv = 'http://www.iana.org/assignments/as-numbers/as-numbers-2.csv'
+    asn16csv = CONFIG['url_deleg_iana_asn16']
+    asn32csv = CONFIG['url_deleg_iana_asn32']
     feed = CONFIG['tabla_asn_iana']
     try:
         statinfo = os.stat(feed) 
@@ -381,61 +384,11 @@ def rdapwhois(CONFIG,ASNs):
         print('Se encontraron errores en las consultas RDAP para los siguientes ASNs:'+str(RDAP404)+"\n")
     return(DatosWHOIS)
     
-def whois(CONFIG,ASNs,rir):
-    cachedir=CONFIG['json_folder']
-    RDAP404=set()
-    DatosWHOIS=dict()
-    
-    try:
-        fileinfo=os.stat(cachedir)
-    except OSError as e:
-        os.mkdir(cachedir)
-    
-    for asn in ASNs:        
-        if (not CONFIG['rdap_'+rir.upper()]):
-            print('No hay informacion de servidor RDAP para el RIR: '+rir)
-            return
-        url=CONFIG['rdap_'+rir]+str(asn)
-        archivo=cachedir+str(asn)+'.json'
-        
-        try:
-            statinfo=os.stat(archivo)
-            if(statinfo.st_size>1000):
-                w=open(archivo,'r')
-                try:
-                    DatosWHOIS[asn]=json.loads(w.read())
-                except ValueError, e:
-                    print('Error en el archivo '+archivo+': ',e)
-                continue
-        except OSError as e:
-            print('No puedo acceder al archivo: '+archivo+', lo consulto.')
-            time.sleep(1)
-    
-    try:
-        request = urllib2.Request(url, headers={'Accept': 'application/json'})
-        f = urllib2.urlopen(request)
-    except urllib2.HTTPError as e:
-        RDAP404.add(asn)
-    else:
-        w=open(archivo,'w')
-        DatosWHOIS[asn]=f.read()
-        try:
-            w.write(DatosWHOIS[asn])
-        except OSError as e:
-            print('Error en el archivo '+archivo+': ',e)
-        f.close()
-        w.close()
-    
-    if (len(RDAP404) > 0):
-        print('Se encontraron errores en las consultas RDAP en el RIR '+rir+' para los siguientes ASNs:'+str(RDAP404))
-        
-    return(DatosWHOIS)
-
 def actualizar_feeds(CONFIG):
     """Actualiza los feeds de informacion desde sitios publicos de internet"""
     print('Verificando si hay archivos para descargar...')
     print("\t  * Delegaciones de los RIR")
-    rehacer = True #False
+    rehacer = False
     listadodeasn=set()
     for rir in ['arin','ripencc','apnic','lacnic','afrinic']:
         url=CONFIG['deleg_'+rir+'_url']
@@ -463,7 +416,6 @@ def actualizar_feeds(CONFIG):
                         contenido = delegation.readlines()
                         for linea in contenido:
                             if not re.search(r'^(arin|ripencc|apnic|lacnic|afrinic)\|',linea):
-#                                print('Linea ignorada: '+linea)
                                 next
                             else:
                                 if re.search(r'\|summary$',linea):
@@ -473,30 +425,9 @@ def actualizar_feeds(CONFIG):
                 except IOError as e:
                     print ('Error al acceder el archivo: '+archivo+': '+e)
             mainfeed.close()
-            chuchuua={"":{"":{}}}
-            ipv4=dict()
-            ipv6=dict()
-            f = open(CONFIG['tmp_folder']+'delegaciones','r')
-            contenido = f.readlines()
-            print('Chequeando CACHE de whois...')
-            for linea in contenido:
-                linea.strip()
-                if re.search(r'asn',linea):
-                    datos = linea.split('|')
-                    rir = datos[0].strip()
-                    pais = datos[1].strip()
-                    tipo = datos[2].strip()
-                    asn = datos[3].strip()
-                    estado = datos[6].strip()
-                    listadodeasn.add(int(asn))
-#                    if(estado.lower()=='assigned' or estado.lower()=='allocated'):
-#                        pepe = whois(CONFIG,listadodeasn,rir.upper())
-### FIXME                
-#            print(chuchuua)
-            
-            f.close()
     print("\t  * ASN's asignados por IANA")
-    
+    parse_asn_rir(CONFIG)
+        
 def unq(seq):
     """ Devuelve un set con elementos unicos """
     seen = set()
@@ -625,3 +556,13 @@ def ribtype(archivo):
                     break
     except IOError as e:
         print('No puedo abrir el archivo '+archivo+': '+e)
+
+#TODO Implementar foldercheck
+def foldercheck(folders):
+    """Checks the existence of a list of folders, if they not exists this function will create it"""
+    for folder in folders:
+        try:
+            if not os.path.exists(folder):
+                os.makedirs(folder)
+        except OSError as e:
+            print('Problemas con la carpeta '+folder+': '+str(e))

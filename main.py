@@ -16,11 +16,7 @@ if __name__ == "__main__":
     import asnutils
 #    from netaddr import IPNetwork, IPAddress
     
-
-# Por el bug del sistema Restful de LACNIC
-    RDAP404=set()
-
-# Configuracion
+# Main configuration
     CONFIG=dict()
     CONFIG['feed_dir']='feeds/'
     CONFIG['feed_ttl']=3600*24*7 #Cada cuantos segundos vuelvo a bajar los feeds
@@ -28,11 +24,11 @@ if __name__ == "__main__":
     CONFIG['rpt_folder']='reportes/'
     CONFIG['tmp_folder']='workdir/'
     CONFIG['htmli_folder']='htmlincludes/'
-    #CONFIG['tabla_mundial']='bgp-global'
-    #CONFIG['tabla_mundial']='rutas-level3.txt'
+    
+    # BGP Global table file
     CONFIG['tabla_mundial']='full-routing-cisco.txt'
-    CONFIG['tabla_asn_iana']=CONFIG['feed_dir']+'asn-rir.csv'
-    CONFIG['tabla_asn_json']=CONFIG['json_folder']+'asn-rir.json'
+    #CONFIG['tabla_mundial']='full-routing-mrt.txt'
+    
     CONFIG['RIR']="lacnic"
     CONFIG['tabla_rir_pais']=CONFIG['feed_dir']+'pais-rir.html'
     CONFIG['deleg_arin']=CONFIG['feed_dir']+'delegated-arin-latest'
@@ -40,19 +36,22 @@ if __name__ == "__main__":
     CONFIG['deleg_ripencc']=CONFIG['feed_dir']+'delegated-ripencc-latest'
     CONFIG['deleg_lacnic']=CONFIG['feed_dir']+'delegated-lacnic-latest'
     CONFIG['deleg_afrinic']=CONFIG['feed_dir']+'delegated-afrinic-latest'
-#    CONFIG['deleg_arin_url']='http://localhost/delegated-arin-latest'
-#    CONFIG['deleg_apnic_url']='http://localhost/delegated-apnic-latest'
-#    CONFIG['deleg_ripencc_url']='http://localhost/delegated-ripencc-latest'
-#    CONFIG['deleg_lacnic_url']='http://localhost/delegated-lacnic-latest'
-#    CONFIG['deleg_afrinic_url']='http://localhost/delegated-afrinic-latest'
+
+    # List of resources delegated by RIR
     CONFIG['deleg_arin_url']='ftp://ftp.apnic.net/pub/stats/arin/delegated-arin-extended-latest'
     CONFIG['deleg_apnic_url']='ftp://ftp.apnic.net/pub/stats/apnic/delegated-apnic-latest'
     CONFIG['deleg_ripencc_url']='ftp://ftp.ripe.net/ripe/stats/delegated-ripencc-latest'
     CONFIG['deleg_lacnic_url']='ftp://ftp.lacnic.net/pub/stats/lacnic/delegated-lacnic-latest'
     CONFIG['deleg_afrinic_url']='ftp://ftp.apnic.net/pub/stats/afrinic/delegated-afrinic-latest'
     
+    # IANA ASN's List
+    CONFIG['tabla_asn_iana']=CONFIG['feed_dir']+'asn-rir.csv'
+    CONFIG['tabla_asn_json']=CONFIG['json_folder']+'asn-rir.json'
+    CONFIG['url_deleg_iana_asn16']='http://www.iana.org/assignments/as-numbers/as-numbers-1.csv'
+    CONFIG['url_deleg_iana_asn32']='http://www.iana.org/assignments/as-numbers/as-numbers-2.csv'
     CONFIG['main_feed']=CONFIG['json_folder']+'main_feed.json'
     
+    # RDAP URL's
     CONFIG['rdap_ARIN']='http://whois.arin.net/rest/asn/AS'
     CONFIG['rdap_RIPENCC']='http://rest.db.ripe.net/search.json?query-string=as'
     CONFIG['rdap_APNIC']=CONFIG['rdap_RIPENCC'] # Todavia no esta implementada la busqueda de ASN, solo IPs: http://www.apnic.net/apnic-info/whois_search/about/rdap
@@ -68,6 +67,7 @@ if __name__ == "__main__":
     RecursosRIR['APNIC']=CONFIG['feed_dir']+'delegated-apnic-latest'
     RecursosRIR['RIPE']=CONFIG['feed_dir']+'delegated-ripencc-latest'
 
+# Main
     asnutils.actualizar_feeds(CONFIG)
     asnutils.parse_asn_rir(CONFIG)
     asnutils.generar_reporte_global(CONFIG)
