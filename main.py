@@ -68,7 +68,7 @@ if __name__ == "__main__":
     RecursosRIR['RIPE']=CONFIG['feed_dir']+'delegated-ripencc-latest'
 
 # Main
-    asnutils.actualizar_feeds(CONFIG)
+    asnutils.update_feeds(CONFIG)
     asnutils.parse_asn_rir(CONFIG)
     asnutils.generar_reporte_global(CONFIG)
     

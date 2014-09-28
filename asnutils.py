@@ -1,13 +1,6 @@
-# TODO Reutilizar los parseCisco y parseMRT en los chequeos de IXP
-# TODO Generar los graficos
-# TODO Armar una funcion que arme carpetas si estas no existen
-# TODO Hacer que el update feeds baje la tabla MRT de RIPE
-# TODO Armar una funcion que agrupe archivos json y temporales en muchas subcarpetas por los limites de los filesystems
-
 __author__="Ariel Weher y Matias Comba"
 __date__ ="$Sep 1, 2014 7:39:33 AM$"
 
-#TODO import ConfigParser
 import json
 import os
 import urllib2
@@ -48,10 +41,16 @@ def generar_reporte_global(CONFIG,force=False):
             
     if (generar==True):
         [ASNsGlobales,LinksGlobales]=make_asn_links(CONFIG['feed_dir']+CONFIG['tabla_mundial'])
-        f=open(CONFIG['tmp_folder']+"RPT_ASNsGlobal",'w')
-        f.write(repr(ASNsGlobales))
-        f=open(CONFIG['tmp_folder']+"RPT_LinksGlobal",'w')
-        f.write(repr(LinksGlobales))
+        try:
+            with open(CONFIG['tmp_folder']+"RPT_ASNsGlobal",'w') as f:
+                f.write(repr(ASNsGlobales))
+        except IOError as e:
+            print('Error en el archivo: '+str(e))
+        try:
+            with open(CONFIG['tmp_folder']+"RPT_LinksGlobal",'w') as f:
+                f.write(repr(LinksGlobales))
+        except IOError as e:
+            print('Error en el archivo: '+str(e))
     
     print("\nReporte de la tabla mundial")
     print ("Cantidad de ASN's en el archivo "+CONFIG['tabla_mundial']+":"+str(len(ASNsGlobales)))
@@ -82,19 +81,33 @@ def generar_reporte_pais(CONFIG,PAIS):
         if ((as0 in DicRIR[PAIS]) or (as1 in DicRIR[PAIS])):
             ASNs_BORDER+=[as0,as1]
             Links_Pais+=[links]
-        
-    f=open(CONFIG['tmp_folder']+"RPT_ASNs_"+PAIS+"_BORDER","w")
-    f.write(repr(ASNs_BORDER))
-    f=open(CONFIG['tmp_folder']+"RPT_Links_bgp-ixp-"+PAIS,"w")
-    f.write(repr(Links_Pais))
-    f=open(CONFIG['tmp_folder']+'RPT_Upstreams_'+PAIS,'w')
-    f.write(repr(Upstream))
+    
+    try:
+        with open(CONFIG['tmp_folder']+"RPT_ASNs_"+PAIS+"_BORDER","w") as f:
+            f.write(repr(ASNs_BORDER))
+    except IOError as e:
+        print('Error en el archivo: '+str(e))
+    
+    try:
+        with open(CONFIG['tmp_folder']+"RPT_Links_bgp-ixp-"+PAIS,"w") as f:
+            f.write(repr(Links_Pais))
+    except IOError as e:
+        print('Error en el archivo: '+str(e))
+    
+    try:
+        with open(CONFIG['tmp_folder']+'RPT_Upstreams_'+PAIS,'w') as f:
+            f.write(repr(Upstream))
+    except IOError as e:
+        print('Error en el archivo: '+str(e))
     
     PaisGL = DicRIR[PAIS] & ASNsGlobales
     
     print ("Cantidad de ASNs de "+PAIS+" en el archivo "+CONFIG['tabla_mundial']+": "+str(len(PaisGL)))
-    f=open(CONFIG['tmp_folder']+"RPT_ASNs_"+PAIS+"_"+CONFIG['tabla_mundial'],'w')
-    f.write(repr(PaisGL))
+    try:
+        with open(CONFIG['tmp_folder']+"RPT_ASNs_"+PAIS+"_"+CONFIG['tabla_mundial'],'w') as f:
+            f.write(repr(PaisGL))
+    except IOError as e:
+        print('Error en el archivo: '+str(e))
     
 def download(url,file,mode='w'):
     """ Descarga un archivo y lo guarda en un path """
@@ -107,10 +120,11 @@ def download(url,file,mode='w'):
         print e.code
         print e.read() 
     else:
-        w=open(file,mode)
+        # TODO Mejorar eso con el esquema de try -> with open
+        open(file,mode)
 
     try:
-        ### NEEDS FIX ###
+        ### TODO NEEDS FIX
         if response.info().get('Content-Encoding') == 'gzip':
 #            print('Usando GZIP para '+file)
             buf = StringIO( response.read())
@@ -159,29 +173,34 @@ def parse_asn_rir(CONFIG):
 #        print('No puedo abrir el archivo '+feed+', lo creo')
         for url in [asn16csv,asn32csv]:
             download(url,feed,'a')
-    
-    with open(feed, 'rb') as csvfile:
-        reader = csv.reader(csvfile, delimiter=',')
-        dicasn = {0:""}
-        for row in reader:
-            colasn=row[0].rstrip()
-            colrir=row[1].rstrip()
-            colwhois=row[2].rstrip()
-            
-            if not (re.match('Assigned',colrir)):
-                continue
-            
-            if (re.match('^[0-9]+',colasn)):
-                ix=0
-                if(re.match('[0-9]+-',colasn)):
-                    inicio,sep,fin = colasn.partition('-')
-                    for ix in range (int(inicio),int(fin)+1):
-                        dicasn[ix]=colrir[12:]
-                else:
-                    dicasn[colasn]=colrir[12:]
-                    
-        with open(CONFIG['tabla_asn_json'], 'wb') as fp:
-            json.dump(dicasn, fp)
+    try:
+        with open(feed, 'r') as csvfile:
+            reader = csv.reader(csvfile, delimiter=',')
+            dicasn = {0:""}
+            for row in reader:
+                colasn=row[0].rstrip()
+                colrir=row[1].rstrip()
+                colwhois=row[2].rstrip()
+
+                if not (re.match('Assigned',colrir)):
+                    continue
+
+                if (re.match('^[0-9]+',colasn)):
+                    ix=0
+                    if(re.match('[0-9]+-',colasn)):
+                        inicio,sep,fin = colasn.partition('-')
+                        for ix in range (int(inicio),int(fin)+1):
+                            dicasn[ix]=colrir[12:]
+                    else:
+                        dicasn[colasn]=colrir[12:]
+            try:            
+                with open(CONFIG['tabla_asn_json'], 'w') as fp:
+                    json.dump(dicasn, fp)
+            except IOError as e:
+                print('Error en el archivo: '+str(e))
+    except IOError as e:
+        print('Error en el archivo: '+str(e))
+                
     
 def generar_reporte_ixp(CONFIG,PAIS,RecursosRIR):
     HTML_IN_1=CONFIG['htmli_folder']+'header.html'
@@ -190,20 +209,26 @@ def generar_reporte_ixp(CONFIG,PAIS,RecursosRIR):
     BGPIXP='bgp-ixp-'+PAIS
         
     [pais_ASNs,ASNpais]=make_asn_pais(RecursosRIR['LACNIC'])
-    f=open(CONFIG['tmp_folder']+"RPT_Dict_RIR",'w')
-    f.write(repr(pais_ASNs))
-    f.close()
-    f=open(CONFIG['tmp_folder']+"RPT_Dict_AS",'w')
-    f.write(repr(ASNpais))
-    f.close()
+    try:
+        with open(CONFIG['tmp_folder']+"RPT_Dict_RIR",'w') as f:
+            f.write(repr(pais_ASNs))
+    except IOError as e:
+        print('Error en el archivo: '+str(e))
+    try:
+        with open(CONFIG['tmp_folder']+"RPT_Dict_AS",'w') as f:
+            f.write(repr(ASNpais))
+    except IOError as e:
+        print('Error en el archivo: '+str(e))
    
     [ASNsIXP,LinksIXP] = make_asn_links(CONFIG['feed_dir']+BGPIXP)
     print ("Cantidad de ASNs en "+BGPIXP+": "+str(len(ASNsIXP)))
     print ("Cantidad de Links en "+BGPIXP+": "+str(len(LinksIXP)))
     
-    f=open(CONFIG['tmp_folder']+'asnsixp-'+PAIS+'.txt','w')
-    f.write(repr(ASNsIXP))
-    f.close()
+    try:
+        with open(CONFIG['tmp_folder']+'asnsixp-'+PAIS+'.txt','w') as f:
+            f.write(repr(ASNsIXP))
+    except IOError as e:
+        print('Error en el archivo: '+str(e))
     
     InterseccionAS = dict()
             
@@ -215,10 +240,16 @@ def generar_reporte_ixp(CONFIG,PAIS,RecursosRIR):
         if len(InterseccionAS[ctry]) > 0:
             print("Cantidad de ASN's de "+str(ctry)+" en el archivo "+str(BGPIXP)+": "+str(len(InterseccionAS[ctry])))
     
-        f=open(CONFIG['tmp_folder']+"RPT_ASNs_"+PAIS+"_"+BGPIXP,'w')
-        f.write(repr(InterseccionAS[ctry]))
-        f=open(CONFIG['tmp_folder']+"RPT_Links_"+PAIS+"_"+BGPIXP,'w')
-        f.write(repr(LinksIXP))
+        try:
+            with open(CONFIG['tmp_folder']+"RPT_ASNs_"+PAIS+"_"+BGPIXP,'w') as f:
+                f.write(repr(InterseccionAS[ctry]))
+        except IOError as e:
+            print('Error en el archivo: '+str(e))
+        try:
+            with open(CONFIG['tmp_folder']+"RPT_Links_"+PAIS+"_"+BGPIXP,'w') as f:
+                f.write(repr(LinksIXP))
+        except IOError as e:
+            print('Error en el archivo: '+str(e))
 
 def is_asn32(asnumber):
     if(is_asdot(asnumber)):
@@ -364,11 +395,14 @@ def rdapwhois(CONFIG,ASNs):
             try:
                 request = urllib2.Request(url, headers={'Accept': 'application/json'})
                 f = urllib2.urlopen(request)
-                w=open(archivo,'w')
-                DatosWHOIS[asn]=f.read()
-                w.write(DatosWHOIS[asn])
-                f.close()
-                w.close()
+                try:
+                    with open(archivo,'w') as w:
+                        DatosWHOIS[asn]=f.read()
+                        w.write(DatosWHOIS[asn])
+                except IOError as e:
+                    print('Error en el archivo: '+str(e))
+                finally:
+                    f.close()
                                 
             except OSError as e:
                     print('Error al escribir en el archivo '+archivo+': ' + str(e))
@@ -384,7 +418,7 @@ def rdapwhois(CONFIG,ASNs):
         print('Se encontraron errores en las consultas RDAP para los siguientes ASNs:'+str(RDAP404)+"\n")
     return(DatosWHOIS)
     
-def actualizar_feeds(CONFIG):
+def update_feeds(CONFIG):
     """Actualiza los feeds de informacion desde sitios publicos de internet"""
     print('Verificando si hay archivos para descargar...')
     print("\t  * Delegaciones de los RIR")
@@ -405,26 +439,29 @@ def actualizar_feeds(CONFIG):
                 print ('Error al acceder el archivo: '+CONFIG['main_feed']+': '+e)
                 
 #            mainfeed = open(CONFIG['main_feed'],'w')
-            mainfeed = open(CONFIG['tmp_folder']+'delegaciones','w')
+            try:
+                with open (CONFIG['tmp_folder']+'delegaciones','w') as mainfeed:
 
-            for rir in ['arin','ripencc','apnic','lacnic','afrinic']:
-                archivo=CONFIG['deleg_'+rir]
-                print("\t\t  --> Parseando "+archivo)
+                    for rir in ['arin','ripencc','apnic','lacnic','afrinic']:
+                        archivo=CONFIG['deleg_'+rir]
+                        print("\t\t  --> Parseando "+archivo)
+
+                        try:
+                            with open(archivo,'r') as delegation:
+                                contenido = delegation.readlines()
+                                for linea in contenido:
+                                    if not re.search(r'^(arin|ripencc|apnic|lacnic|afrinic)\|',linea):
+                                        next
+                                    else:
+                                        if re.search(r'\|summary$',linea):
+                                            next
+                                        else:
+                                            mainfeed.write(linea.strip()+"\n")
+                        except IOError as e:
+                            print ('Error al acceder el archivo: '+archivo+': '+e)
+            except IOError as e:
+                print('Error en el archivo: '+str(e))
                 
-                try:
-                    with open(archivo,'r') as delegation:
-                        contenido = delegation.readlines()
-                        for linea in contenido:
-                            if not re.search(r'^(arin|ripencc|apnic|lacnic|afrinic)\|',linea):
-                                next
-                            else:
-                                if re.search(r'\|summary$',linea):
-                                    next
-                                else:
-                                    mainfeed.write(linea.strip()+"\n")
-                except IOError as e:
-                    print ('Error al acceder el archivo: '+archivo+': '+e)
-            mainfeed.close()
     print("\t  * ASN's asignados por IANA")
     parse_asn_rir(CONFIG)
         
