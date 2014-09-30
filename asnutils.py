@@ -28,11 +28,11 @@ def generar_reporte_global(CONFIG,force=False):
     else:
         generar = True
 # Veo si existen los archivos preprocesados y los leo
-    if (os.path.isfile(CONFIG['tmp_folder']+"RPT_ASNsGlobal") and os.path.isfile(CONFIG['tmp_folder']+"RPT_LinksGlobal")):
-        if ((os.stat(CONFIG['tmp_folder']+"RPT_ASNsGlobal").st_size > 0) and (os.stat(CONFIG['tmp_folder']+"RPT_LinksGlobal").st_size > 0)):
-            f=open(CONFIG['tmp_folder']+"RPT_ASNsGlobal",'r')
+    if (os.path.isfile(CONFIG['tmp_dir']+"RPT_ASNsGlobal") and os.path.isfile(CONFIG['tmp_dir']+"RPT_LinksGlobal")):
+        if ((os.stat(CONFIG['tmp_dir']+"RPT_ASNsGlobal").st_size > 0) and (os.stat(CONFIG['tmp_dir']+"RPT_LinksGlobal").st_size > 0)):
+            f=open(CONFIG['tmp_dir']+"RPT_ASNsGlobal",'r')
             ASNsGlobales=eval(f.readline())
-            f=open(CONFIG['tmp_folder']+"RPT_LinksGlobal",'r')
+            f=open(CONFIG['tmp_dir']+"RPT_LinksGlobal",'r')
             LinksGlobales=eval(f.readline())
         else:
             generar = True
@@ -42,12 +42,12 @@ def generar_reporte_global(CONFIG,force=False):
     if (generar==True):
         [ASNsGlobales,LinksGlobales]=make_asn_links(CONFIG['feed_dir']+CONFIG['tabla_mundial'])
         try:
-            with open(CONFIG['tmp_folder']+"RPT_ASNsGlobal",'w') as f:
+            with open(CONFIG['tmp_dir']+"RPT_ASNsGlobal",'w') as f:
                 f.write(repr(ASNsGlobales))
         except IOError as e:
             print('Error en el archivo: '+str(e))
         try:
-            with open(CONFIG['tmp_folder']+"RPT_LinksGlobal",'w') as f:
+            with open(CONFIG['tmp_dir']+"RPT_LinksGlobal",'w') as f:
                 f.write(repr(LinksGlobales))
         except IOError as e:
             print('Error en el archivo: '+str(e))
@@ -59,9 +59,9 @@ def generar_reporte_global(CONFIG,force=False):
     
 def generar_reporte_pais(CONFIG,PAIS):    
     """De la lista Global de Links genera: ASNs de borde, Upstream de cada AS, Links dentro de un pais """
-    f=open(CONFIG['tmp_folder']+"RPT_ASNsGlobal",'r')
+    f=open(CONFIG['tmp_dir']+"RPT_ASNsGlobal",'r')
     ASNsGlobales=eval(f.readline())
-    f=open(CONFIG['tmp_folder']+"RPT_LinksGlobal",'r')
+    f=open(CONFIG['tmp_dir']+"RPT_LinksGlobal",'r')
     LinksGlobales=eval(f.readline())
     
     Upstream={"":[]}
@@ -83,19 +83,19 @@ def generar_reporte_pais(CONFIG,PAIS):
             Links_Pais+=[links]
     
     try:
-        with open(CONFIG['tmp_folder']+"RPT_ASNs_"+PAIS+"_BORDER","w") as f:
+        with open(CONFIG['tmp_dir']+"RPT_ASNs_"+PAIS+"_BORDER","w") as f:
             f.write(repr(ASNs_BORDER))
     except IOError as e:
         print('Error en el archivo: '+str(e))
     
     try:
-        with open(CONFIG['tmp_folder']+"RPT_Links_bgp-ixp-"+PAIS,"w") as f:
+        with open(CONFIG['tmp_dir']+"RPT_Links_bgp-ixp-"+PAIS,"w") as f:
             f.write(repr(Links_Pais))
     except IOError as e:
         print('Error en el archivo: '+str(e))
     
     try:
-        with open(CONFIG['tmp_folder']+'RPT_Upstreams_'+PAIS,'w') as f:
+        with open(CONFIG['tmp_dir']+'RPT_Upstreams_'+PAIS,'w') as f:
             f.write(repr(Upstream))
     except IOError as e:
         print('Error en el archivo: '+str(e))
@@ -104,7 +104,7 @@ def generar_reporte_pais(CONFIG,PAIS):
     
     print ("Cantidad de ASNs de "+PAIS+" en el archivo "+CONFIG['tabla_mundial']+": "+str(len(PaisGL)))
     try:
-        with open(CONFIG['tmp_folder']+"RPT_ASNs_"+PAIS+"_"+CONFIG['tabla_mundial'],'w') as f:
+        with open(CONFIG['tmp_dir']+"RPT_ASNs_"+PAIS+"_"+CONFIG['tabla_mundial'],'w') as f:
             f.write(repr(PaisGL))
     except IOError as e:
         print('Error en el archivo: '+str(e))
@@ -202,20 +202,21 @@ def parse_asn_rir(CONFIG):
         print('Error en el archivo: '+str(e))
                 
     
-def generar_reporte_ixp(CONFIG,PAIS,RecursosRIR):
-    HTML_IN_1=CONFIG['htmli_folder']+'header.html'
-    HTML_IN_2=CONFIG['htmli_folder']+'footer.html'
+def generar_reporte_ixp(CONFIG,PAIS):
+    HTML_IN_1=CONFIG['htmli_dir']+'header.html'
+    HTML_IN_2=CONFIG['htmli_dir']+'footer.html'
     print("\nReporte de "+PAIS)
     BGPIXP='bgp-ixp-'+PAIS
-        
-    [pais_ASNs,ASNpais]=make_asn_pais(RecursosRIR['LACNIC'])
+    
+    #TODO Review and fix this
+    [pais_ASNs,ASNpais]=make_asn_pais(CONFIG['deleg_lacnic'])
     try:
-        with open(CONFIG['tmp_folder']+"RPT_Dict_RIR",'w') as f:
+        with open(CONFIG['tmp_dir']+"RPT_Dict_RIR",'w') as f:
             f.write(repr(pais_ASNs))
     except IOError as e:
         print('Error en el archivo: '+str(e))
     try:
-        with open(CONFIG['tmp_folder']+"RPT_Dict_AS",'w') as f:
+        with open(CONFIG['tmp_dir']+"RPT_Dict_AS",'w') as f:
             f.write(repr(ASNpais))
     except IOError as e:
         print('Error en el archivo: '+str(e))
@@ -225,7 +226,7 @@ def generar_reporte_ixp(CONFIG,PAIS,RecursosRIR):
     print ("Cantidad de Links en "+BGPIXP+": "+str(len(LinksIXP)))
     
     try:
-        with open(CONFIG['tmp_folder']+'asnsixp-'+PAIS+'.txt','w') as f:
+        with open(CONFIG['tmp_dir']+'asnsixp-'+PAIS+'.txt','w') as f:
             f.write(repr(ASNsIXP))
     except IOError as e:
         print('Error en el archivo: '+str(e))
@@ -241,12 +242,12 @@ def generar_reporte_ixp(CONFIG,PAIS,RecursosRIR):
             print("Cantidad de ASN's de "+str(ctry)+" en el archivo "+str(BGPIXP)+": "+str(len(InterseccionAS[ctry])))
     
         try:
-            with open(CONFIG['tmp_folder']+"RPT_ASNs_"+PAIS+"_"+BGPIXP,'w') as f:
+            with open(CONFIG['tmp_dir']+"RPT_ASNs_"+PAIS+"_"+BGPIXP,'w') as f:
                 f.write(repr(InterseccionAS[ctry]))
         except IOError as e:
             print('Error en el archivo: '+str(e))
         try:
-            with open(CONFIG['tmp_folder']+"RPT_Links_"+PAIS+"_"+BGPIXP,'w') as f:
+            with open(CONFIG['tmp_dir']+"RPT_Links_"+PAIS+"_"+BGPIXP,'w') as f:
                 f.write(repr(LinksIXP))
         except IOError as e:
             print('Error en el archivo: '+str(e))
@@ -360,7 +361,7 @@ def make_asn_links(bgpdump):
     return([set(ListaASNs), set(ListaLinks)])
 
 def rdapwhois(CONFIG,ASNs):
-    cachedir=CONFIG['json_folder']
+    cachedir=CONFIG['json_dir']
     RDAP404=set()
     DatosWHOIS=dict()
     
@@ -395,15 +396,14 @@ def rdapwhois(CONFIG,ASNs):
             try:
                 request = urllib2.Request(url, headers={'Accept': 'application/json'})
                 f = urllib2.urlopen(request)
-                try:
-                    with open(archivo,'w') as w:
-                        DatosWHOIS[asn]=f.read()
-                        w.write(DatosWHOIS[asn])
-                except IOError as e:
+                
+                with open(archivo,'w') as w:
+                    DatosWHOIS[asn]=f.read()
+                    w.write(DatosWHOIS[asn])
+                
+            except IOError as e:
                     print('Error en el archivo: '+str(e))
-                finally:
-                    f.close()
-                                
+                    
             except OSError as e:
                     print('Error al escribir en el archivo '+archivo+': ' + str(e))
                 
@@ -413,6 +413,9 @@ def rdapwhois(CONFIG,ASNs):
                 
             except Exception as e:
                 print('Error: '+str(e))
+            
+            else:
+                f.close()
 
     if (len(RDAP404) > 0):
         print('Se encontraron errores en las consultas RDAP para los siguientes ASNs:'+str(RDAP404)+"\n")
@@ -440,7 +443,7 @@ def update_feeds(CONFIG):
                 
 #            mainfeed = open(CONFIG['main_feed'],'w')
             try:
-                with open (CONFIG['tmp_folder']+'delegaciones','w') as mainfeed:
+                with open (CONFIG['tmp_dir']+'delegaciones','w') as mainfeed:
 
                     for rir in ['arin','ripencc','apnic','lacnic','afrinic']:
                         archivo=CONFIG['deleg_'+rir]
@@ -472,10 +475,10 @@ def unq(seq):
     return [ x for x in seq if not (x in seen or seen_add(x))]
 
 def generar_faltantes(CONFIG,PAIS):
-    f=open(CONFIG['tmp_folder']+"RPT_ASNs_"+PAIS+'_'+CONFIG['tabla_mundial'],'r')
+    f=open(CONFIG['tmp_dir']+"RPT_ASNs_"+PAIS+'_'+CONFIG['tabla_mundial'],'r')
     ASNsGlobales=eval(f.readline())
     f.close()
-    f=open(CONFIG['tmp_folder']+'asnsixp-'+PAIS+'.txt','r')
+    f=open(CONFIG['tmp_dir']+'asnsixp-'+PAIS+'.txt','r')
     ASNsIXP=eval(f.readline())
     f.close()
     
@@ -491,7 +494,7 @@ def generar_faltantes(CONFIG,PAIS):
     
     for faltante in noestanenelixp:
         try:
-            with open(CONFIG['json_folder']+faltante+'.json','r') as j:
+            with open(CONFIG['json_dir']+faltante+'.json','r') as j:
                 jdata = json.load(j)
                 print('\t --> AS'+faltante+' '+jdata['entities'][0]['vcardArray'][1][5][3][0].encode('utf-8'))
                 print('\t\t Tecnico: '+jdata['entities'][2]['vcardArray'][1][1][3].encode('utf-8'))
@@ -594,12 +597,20 @@ def ribtype(archivo):
     except IOError as e:
         print('No puedo abrir el archivo '+archivo+': '+e)
 
-#TODO Implementar foldercheck
-def foldercheck(folders):
+def foldercheck(CONFIG):
     """Checks the existence of a list of folders, if they not exists this function will create it"""
+    folders = set()
+    for clave in CONFIG.keys():
+        if(re.search(r'.*_dir.*',clave)):
+            folders.add(clave)
+    
     for folder in folders:
         try:
-            if not os.path.exists(folder):
-                os.makedirs(folder)
+            if not os.path.exists(CONFIG[folder]):
+                os.makedirs(CONFIG[folder])
         except OSError as e:
             print('Problemas con la carpeta '+folder+': '+str(e))
+            
+def cidrsOverlap(cidr0, cidr1):
+    """ Determina si un prefijo es componente de otro"""
+    return cidr0.first <= cidr1.last and cidr1.first <= cidr0.last
