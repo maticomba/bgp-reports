@@ -7,10 +7,6 @@
 __author__="a.weher"
 __date__ ="$Sep 1, 2014 11:38:27 AM$"
 
-def cidrsOverlap(cidr0, cidr1):
-    """ Determina si un prefijo es componente de otro"""
-    return cidr0.first <= cidr1.last and cidr1.first <= cidr0.last
-
 if __name__ == "__main__":
     import asn
     import asnutils
@@ -19,7 +15,7 @@ if __name__ == "__main__":
 # Main configuration
     CONFIG=dict()
     CONFIG['feed_dir']='feeds/'
-    CONFIG['feed_ttl']=3600*24*7 #Cada cuantos segundos vuelvo a bajar los feeds
+    CONFIG['feed_ttl']=3600*24*7*7 #Cada cuantos segundos vuelvo a bajar los feeds
     CONFIG['json_dir']='cache/'
     CONFIG['rpt_dir']='reportes/'
     CONFIG['tmp_dir']='workdir/'
@@ -66,9 +62,9 @@ if __name__ == "__main__":
     asnutils.generar_reporte_global(CONFIG)
     
     for PAIS in ['AR','CL']:
-        asnutils.generar_reporte_ixp(CONFIG,PAIS)
+        asnutils.generate_ixp_report(CONFIG,PAIS)
         asnutils.generar_reporte_pais(CONFIG,PAIS)
-        asnutils.generar_faltantes(CONFIG,PAIS)
+        asnutils.report_missing_asns(CONFIG,PAIS)
         
     print"\nHave a nice day"
     exit

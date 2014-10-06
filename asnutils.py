@@ -121,7 +121,7 @@ def download(url,file,mode='w'):
         print e.read() 
     else:
         # TODO Mejorar eso con el esquema de try -> with open
-        open(file,mode)
+        w=open(file,mode)
 
     try:
         ### TODO NEEDS FIX
@@ -133,10 +133,13 @@ def download(url,file,mode='w'):
         else:
             data = response.read()
         w.write(data)
+        w.close()
     except OSError as e:
         print(e)
         response.close()
-        w.close()
+    except:
+        print('Error: ',str(e))
+        pass
 
 def olderthan(file,ttl=86400*7):
     """ Chequea la fecha de modificacion de un archivo """
@@ -202,7 +205,7 @@ def parse_asn_rir(CONFIG):
         print('Error en el archivo: '+str(e))
                 
     
-def generar_reporte_ixp(CONFIG,PAIS):
+def generate_ixp_report(CONFIG,PAIS):
     HTML_IN_1=CONFIG['htmli_dir']+'header.html'
     HTML_IN_2=CONFIG['htmli_dir']+'footer.html'
     print("\nReporte de "+PAIS)
@@ -392,7 +395,7 @@ def rdapwhois(CONFIG,ASNs):
             else:
                 raise OSError('Archivo menor a 1000 bytes')
 
-        except OSError as e:            
+        except (IOError,OSError) as e:            
             try:
                 request = urllib2.Request(url, headers={'Accept': 'application/json'})
                 f = urllib2.urlopen(request)
@@ -400,22 +403,19 @@ def rdapwhois(CONFIG,ASNs):
                 with open(archivo,'w') as w:
                     DatosWHOIS[asn]=f.read()
                     w.write(DatosWHOIS[asn])
-                
-            except IOError as e:
-                    print('Error en el archivo: '+str(e))
                     
-            except OSError as e:
-                    print('Error al escribir en el archivo '+archivo+': ' + str(e))
-                
-            except urllib2.HTTPError as e:
+            except (urllib2.HTTPError,urllib2.URLError) as e:
                 RDAP404.add(asn)
-                print(str(e)+" ("+url+")")
+#                print("No se pudo obtener '"+url+"' => "+ str(e))
                 
-            except Exception as e:
-                print('Error: '+str(e))
-            
+            except (IOError,OSError) as e:
+                print('Error en el archivo '+archivo+': ' + str(e))
+                
             else:
                 f.close()
+        
+        except Exception as e:
+                print('Error: '+str(e))
 
     if (len(RDAP404) > 0):
         print('Se encontraron errores en las consultas RDAP para los siguientes ASNs:'+str(RDAP404)+"\n")
@@ -474,7 +474,7 @@ def unq(seq):
     seen_add = seen.add
     return [ x for x in seq if not (x in seen or seen_add(x))]
 
-def generar_faltantes(CONFIG,PAIS):
+def report_missing_asns(CONFIG,PAIS):
     f=open(CONFIG['tmp_dir']+"RPT_ASNs_"+PAIS+'_'+CONFIG['tabla_mundial'],'r')
     ASNsGlobales=eval(f.readline())
     f.close()
@@ -491,6 +491,12 @@ def generar_faltantes(CONFIG,PAIS):
     
     datoswhois = rdapwhois(CONFIG,ASNsFaltantesEnElIXP)
     print('ASNs publicados al mundo que faltan en el IXP de '+PAIS+': '+str(len(ASNsFaltantesEnElIXP)))
+    
+    try:
+        with open(CONFIG['tmp_dir']+"RPT_ASNs_"+PAIS+'_faltantes',w) as f:
+            f.write(repr(noestanenelixp))
+    except Exception as e:
+        print('Error: ',str(e))
     
     for faltante in noestanenelixp:
         try:
