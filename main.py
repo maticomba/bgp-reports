@@ -14,11 +14,11 @@ if __name__ == "__main__":
     
 # Main configuration
     CONFIG=dict()
-    CONFIG['feed_dir']='feeds/'
-    CONFIG['feed_ttl']=3600*24*7*7 #Cada cuantos segundos vuelvo a bajar los feeds
+    CONFIG['feed_dir']='feeds/' # Where to put the downloaded routing tables and rir assignments
+    CONFIG['feed_ttl']=3600*24*7 #Seconds needed to download all the feeds again
     CONFIG['json_dir']='cache/'
     CONFIG['rpt_dir']='reportes/'
-    CONFIG['tmp_dir']='workdir/'
+    CONFIG['tmp_dir']='workdir/' # Temporal directory for internal reports
     CONFIG['htmli_dir']='htmlincludes/'
     
     # BGP Global table file

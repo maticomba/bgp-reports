@@ -44,9 +44,6 @@ def generar_reporte_global(CONFIG,force=False):
         try:
             with open(CONFIG['tmp_dir']+"RPT_ASNsGlobal",'w') as f:
                 f.write(repr(ASNsGlobales))
-        except IOError as e:
-            print('Error en el archivo: '+str(e))
-        try:
             with open(CONFIG['tmp_dir']+"RPT_LinksGlobal",'w') as f:
                 f.write(repr(LinksGlobales))
         except IOError as e:
@@ -85,16 +82,8 @@ def generar_reporte_pais(CONFIG,PAIS):
     try:
         with open(CONFIG['tmp_dir']+"RPT_ASNs_"+PAIS+"_BORDER","w") as f:
             f.write(repr(ASNs_BORDER))
-    except IOError as e:
-        print('Error en el archivo: '+str(e))
-    
-    try:
         with open(CONFIG['tmp_dir']+"RPT_Links_bgp-ixp-"+PAIS,"w") as f:
             f.write(repr(Links_Pais))
-    except IOError as e:
-        print('Error en el archivo: '+str(e))
-    
-    try:
         with open(CONFIG['tmp_dir']+'RPT_Upstreams_'+PAIS,'w') as f:
             f.write(repr(Upstream))
     except IOError as e:
@@ -493,7 +482,7 @@ def report_missing_asns(CONFIG,PAIS):
     print('ASNs publicados al mundo que faltan en el IXP de '+PAIS+': '+str(len(ASNsFaltantesEnElIXP)))
     
     try:
-        with open(CONFIG['tmp_dir']+"RPT_ASNs_"+PAIS+'_faltantes',w) as f:
+        with open(CONFIG['tmp_dir']+"RPT_ASNs_"+PAIS+'_faltantes','w') as f:
             f.write(repr(noestanenelixp))
     except Exception as e:
         print('Error: ',str(e))
@@ -507,6 +496,8 @@ def report_missing_asns(CONFIG,PAIS):
                 print('\t\t Email: <'+jdata['entities'][2]['vcardArray'][1][3][3].lower()+'>')
         except IOError as e:
             print('\t --> [RDAP-Bug] Error al leer el JSON de AS'+str(faltante))
+        except Exception as e:
+            print('Error: ',str(e))
 
 def parseMRT(bgpfile):
     """Devuelve dos conjuntos desde un dump BGP"""
@@ -522,14 +513,16 @@ def parseMRT(bgpfile):
             for asn in asns:
                 if(asn[0] == '{'):
                     asset=txtxtract(asn,'{','}')
-                    for componente in asset:
+                    while asset:
+                        componente,sp,asset=asset.partition(",")
                         ListaASNs+=[componente]
-                        ListaLinks+=[asset[0]+','+componente]
+                        if(componente != lastasn):
+                            ListaLinks+=[lastasn+','+componente]
                 else:
                     ListaASNs+=[asn]
-                    if(lastasn > 0):
+                    if(lastasn > 0 and asn != lastasn):
                         ListaLinks+=[lastasn+','+asn]
-                    lastasn=asn
+                    lastasn=asn            
     return([set(ListaASNs), set(ListaLinks)])
 
 def parseCisco(bgpfile):
@@ -554,12 +547,14 @@ def parseCisco(bgpfile):
                 for asn in asns:
                     if(asn[0] == '{'):
                         asset=txtxtract(asn,'{','}')
-                        for componente in asset:
+                        while asset:
+                            componente,sp,asset=asset.partition(",")
                             ListaASNs+=[componente]
-                            ListaLinks+=[asset[0]+','+componente]
+                            if(componente != lastasn):
+                                ListaLinks+=[lastasn+','+componente]
                     else:
                         ListaASNs+=[asn]
-                        if(lastasn > 0):
+                        if(lastasn > 0 and asn != lastasn):
                             ListaLinks+=[lastasn+','+asn]
                         lastasn=asn
         return([set(ListaASNs), set(ListaLinks)])
