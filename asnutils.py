@@ -81,7 +81,7 @@ def generar_reporte_pais(CONFIG,PAIS):
     
     try:
         with open(CONFIG['tmp_dir']+"RPT_ASNs_"+PAIS+"_BORDER","w") as f:
-            f.write(repr(ASNs_BORDER))
+            f.write(repr(ASNs_BORDER)) #TODO Actualmente se graba pero no se usa, mejorar y armar como se graban los links
         with open(CONFIG['tmp_dir']+"RPT_Links_bgp-ixp-"+PAIS,"w") as f:
             f.write(repr(Links_Pais))
         with open(CONFIG['tmp_dir']+'RPT_Upstreams_'+PAIS,'w') as f:
@@ -465,17 +465,55 @@ def unq(seq):
 
 def report_missing_asns(CONFIG,PAIS):
     f=open(CONFIG['tmp_dir']+"RPT_ASNs_"+PAIS+'_'+CONFIG['tabla_mundial'],'r')
-    ASNsGlobales=eval(f.readline())
+    ASNsGlobalesDelPais=eval(f.readline())
     f.close()
     f=open(CONFIG['tmp_dir']+'asnsixp-'+PAIS+'.txt','r')
-    ASNsIXP=eval(f.readline())
+    ASNsDelIXP=eval(f.readline())
     f.close()
     
-    ASNsFaltantesEnElIXP = ASNsGlobales - ASNsIXP
+    upstreams=dict()
+    try:
+        with open(CONFIG['tmp_dir']+'RPT_Upstreams_'+PAIS,'r') as rpt:
+            upstreams=eval(rpt.readline())
+    except Exception as e:
+            print('Error en el archivo: '+str(e))
+            
+    ASNsFaltantesEnElIXP = ASNsGlobalesDelPais - ASNsDelIXP
     noestanenelixp=list()
     
-    for item in ASNsFaltantesEnElIXP:
-        noestanenelixp.append(item)
+    ProveedoresDeAsnFaltantes=dict()
+    ProveedoresQueNoAnuncianUnASN=dict()
+    ProveedorInternacional=set()
+    for asn in ASNsFaltantesEnElIXP:
+        noestanenelixp.append(asn)
+        for upst in upstreams[asn]:
+            if not (upst in ASNsGlobalesDelPais):
+                ProveedorInternacional|={upst}
+            ListaProveedores=[upst]
+            procesados=[upst]
+            for proveedor in ListaProveedores:
+                if proveedor in ASNsDelIXP:
+                    ProveedoresDeAsnFaltantes[asn]=proveedor
+                    if proveedor in ProveedoresQueNoAnuncianUnASN:
+                        ProveedoresQueNoAnuncianUnASN[proveedor]|={asn}
+                    else:
+                        ProveedoresQueNoAnuncianUnASN[proveedor]={asn}
+                    break
+                elif proveedor in procesados:
+                    break
+                elif len(ListaProveedores)>20:
+                    print('Error: Demasiados Upstreams para procesar el ASN '+str(upst))
+                    print('Listado: '+str(ListaProveedores))
+                    break
+                ListaProveedores=list(upstreams[proveedor])
+                procesados+=[proveedor]
+    print('Proveedores Internacionales de los ASN que no estan en en IXP de '+str(PAIS)+':')
+    print(ProveedorInternacional) #TODO Hacer mas legible
+        
+    print('Proveedores que estan en el IXP de '+str(PAIS)+' y no anuncian a los faltantes: '+str(len(ProveedoresQueNoAnuncianUnASN.keys())))
+    for isp in ProveedoresQueNoAnuncianUnASN.keys():
+        print('El AS'+str(isp)+' deberia anunciar: '+str(ProveedoresQueNoAnuncianUnASN[isp])) #TODO Hacer mas legible
+    
     noestanenelixp.sort()
     
     datoswhois = rdapwhois(CONFIG,ASNsFaltantesEnElIXP)
@@ -484,6 +522,8 @@ def report_missing_asns(CONFIG,PAIS):
     try:
         with open(CONFIG['tmp_dir']+"RPT_ASNs_"+PAIS+'_faltantes','w') as f:
             f.write(repr(noestanenelixp))
+        with open(CONFIG['tmp_dir']+"RPT_ASNs_"+PAIS+'_nopublican','w') as f:
+            f.write(repr(ProveedoresQueNoAnuncianUnASN))
     except Exception as e:
         print('Error: ',str(e))
     
