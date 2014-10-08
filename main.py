@@ -1,16 +1,25 @@
-#! /usr/bin/python
+#! /usr/bin/env python
 
-# To change this license header, choose License Headers in Project Properties.
-# To change this template file, choose Tools | Templates
-# and open the template in the editor.
+# This file is part of bgp-reports.
+#
+#    bgp-reports is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    bgp-reports is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with bgp-reports.  If not, see <http://www.gnu.org/licenses/>.
 
 __author__="a.weher"
 __date__ ="$Sep 1, 2014 11:38:27 AM$"
 
 if __name__ == "__main__":
-    import asn
     import asnutils
-#    from netaddr import IPNetwork, IPAddress
     
 # Main configuration
     CONFIG=dict()
@@ -21,12 +30,12 @@ if __name__ == "__main__":
     CONFIG['tmp_dir']='workdir/' # Temporal directory for internal reports
     CONFIG['htmli_dir']='htmlincludes/'
     
-    # BGP Global table file
+    # These are countries for which you have the IXP routing table
+    CONFIG['countries_to_report']=['AR','CL']
+    
+    # BGP Global table file, there are two formats available. MRT is the smaller one.
     CONFIG['tabla_mundial']='full-routing-cisco.txt'
     #CONFIG['tabla_mundial']='full-routing-mrt.txt'
-    
-    CONFIG['RIR']="lacnic"
-    CONFIG['tabla_rir_pais']=CONFIG['feed_dir']+'pais-rir.html'
     
     # List of resources delegated by RIR
     CONFIG['deleg_arin_url']='ftp://ftp.apnic.net/pub/stats/arin/delegated-arin-extended-latest'
@@ -61,7 +70,7 @@ if __name__ == "__main__":
     asnutils.parse_asn_rir(CONFIG)
     asnutils.generar_reporte_global(CONFIG)
     
-    for PAIS in ['AR','CL']:
+    for PAIS in CONFIG['countries_to_report']:
         asnutils.generate_ixp_report(CONFIG,PAIS)
         asnutils.generar_reporte_pais(CONFIG,PAIS)
         asnutils.report_missing_asns(CONFIG,PAIS)

@@ -1,3 +1,20 @@
+#! /usr/bin/env python
+
+# This file is part of bgp-reports.
+#
+#    bgp-reports is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    bgp-reports is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with bgp-reports.  If not, see <http://www.gnu.org/licenses/>.
+
 __author__="Ariel Weher y Matias Comba"
 __date__ ="$Sep 1, 2014 7:39:33 AM$"
 
@@ -9,6 +26,7 @@ import re
 import time
 from StringIO import StringIO
 import gzip
+import HTML
 
 def colorprint(color,txt):
     colores={
@@ -197,7 +215,7 @@ def parse_asn_rir(CONFIG):
 def generate_ixp_report(CONFIG,PAIS):
     HTML_IN_1=CONFIG['htmli_dir']+'header.html'
     HTML_IN_2=CONFIG['htmli_dir']+'footer.html'
-    print("\nReporte de "+PAIS)
+    print("\n====== Reporte de "+PAIS+" ======\n")
     BGPIXP='bgp-ixp-'+PAIS
     
     #TODO Review and fix this
@@ -289,6 +307,8 @@ def find_rir_by_asn(CONFIG,asnumber):
         data = json.load(archivo)
         if(data[asnumber]=='RIPE NCC'):
             return 'RIPENCC'
+        elif(data[asnumber])=='':
+            return 'NOTFOUND'
         return (data[asnumber])
 
 def find_rir_by_country(CONFIG,country):
@@ -365,13 +385,37 @@ def rdapwhois(CONFIG,ASNs):
     
     for asn in ASNs:
         # Busco a que rir pertenece el AS
-        rir=find_rir_by_asn(CONFIG,asn)
+        if (asn != '0'):
+            rir=find_rir_by_asn(CONFIG,asn)
+        
         if (rir == 'SPECIAL'):
             next
-        if (not CONFIG['rdap_'+rir.upper()]):
-            print('No hay informacion de servidor RDAP para el RIR: '+rir)
-            return
-        url=CONFIG['rdap_'+rir]+str(asn)
+            
+        if (rir == 'NOTFOUND'):
+            next
+        
+        try: # TODO: Tuve que meter esto en un try porque fallaba cuando lo llamaba desde nombreasn()
+            if rir == 'ARIN':
+                url=str(CONFIG['rdap_ARIN']+str(asn))
+            elif rir == 'RIPENCC':
+                url=str(CONFIG['rdap_RIPENCC']+str(asn))
+            elif rir == 'APNIC':
+                url=str(CONFIG['rdap_APNIC']+str(asn))
+            elif rir == 'LACNIC':
+                url=str(CONFIG['rdap_LACNIC']+str(asn))
+            elif rir == 'AFRINIC':
+                url=str(CONFIG['rdap_AFRINIC']+str(asn))
+            else:
+                print('No hay informacion de servidor RDAP para el AS'+str(asn)+' en el RIR: '+rir)
+                next
+    
+#            if (not CONFIG['rdap_'+rir.upper()]):
+#                print('No hay informacion de servidor RDAP para el RIR: '+rir)
+#                return
+#            url=str(CONFIG['rdap_'+rir]+str(asn))
+        except:
+            next
+        
         archivo=cachedir+str(asn)+'.json'
         
         try:            
@@ -395,7 +439,7 @@ def rdapwhois(CONFIG,ASNs):
                     
             except (urllib2.HTTPError,urllib2.URLError) as e:
                 RDAP404.add(asn)
-#                print("No se pudo obtener '"+url+"' => "+ str(e))
+                print("No se pudo obtener '"+url+"' => "+ str(e))
                 
             except (IOError,OSError) as e:
                 print('Error en el archivo '+archivo+': ' + str(e))
@@ -507,17 +551,23 @@ def report_missing_asns(CONFIG,PAIS):
                     break
                 ListaProveedores=list(upstreams[proveedor])
                 procesados+=[proveedor]
-    print('Proveedores Internacionales de los ASN que no estan en en IXP de '+str(PAIS)+':')
-    print(ProveedorInternacional) #TODO Hacer mas legible
+    print('\nProveedores Internacionales de los ASN que no estan en en IXP de '+str(PAIS)+':')
+    for carrier in ProveedorInternacional:
+        nombre=nombreasn(CONFIG,carrier)
+        print('\t--> AS'+str(carrier)+nombre)
         
-    print('Proveedores que estan en el IXP de '+str(PAIS)+' y no anuncian a los faltantes: '+str(len(ProveedoresQueNoAnuncianUnASN.keys())))
+    print('\nCantidad de ASNs que estan en el IXP de '+str(PAIS)+' y no anuncian a todos los ASN: '+str(len(ProveedoresQueNoAnuncianUnASN.keys()))+'\n')
     for isp in ProveedoresQueNoAnuncianUnASN.keys():
-        print('El AS'+str(isp)+' deberia anunciar: '+str(ProveedoresQueNoAnuncianUnASN[isp])) #TODO Hacer mas legible
+        nombre=nombreasn(CONFIG,isp)
+        print('\nEl AS'+str(isp)+nombre+' no esta anunciando los siguientes ASNs en el IXP de '+str(PAIS)+': ')
+        for numero in ProveedoresQueNoAnuncianUnASN[isp]:
+            nombre=nombreasn(CONFIG,numero)
+            print('\t --> AS'+str(numero)+nombre)
     
     noestanenelixp.sort()
     
     datoswhois = rdapwhois(CONFIG,ASNsFaltantesEnElIXP)
-    print('ASNs publicados al mundo que faltan en el IXP de '+PAIS+': '+str(len(ASNsFaltantesEnElIXP)))
+    print('\nASNs que publican al mundo y no estan directamente conectados al IXP de '+PAIS+': '+str(len(ASNsFaltantesEnElIXP)))
     
     try:
         with open(CONFIG['tmp_dir']+"RPT_ASNs_"+PAIS+'_faltantes','w') as f:
@@ -535,7 +585,7 @@ def report_missing_asns(CONFIG,PAIS):
                 print('\t\t Tecnico: '+jdata['entities'][2]['vcardArray'][1][1][3].encode('utf-8'))
                 print('\t\t Email: <'+jdata['entities'][2]['vcardArray'][1][3][3].lower()+'>')
         except IOError as e:
-            print('\t --> [RDAP-Bug] Error al leer el JSON de AS'+str(faltante))
+            print('\t --> [RDAP-Bug] Error al leer el JSON de AS'+str(faltante)+', reportar al RIR')
         except Exception as e:
             print('Error: ',str(e))
 
@@ -655,3 +705,13 @@ def foldercheck(CONFIG):
 def cidrsOverlap(cidr0, cidr1):
     """ Determina si un prefijo es componente de otro"""
     return cidr0.first <= cidr1.last and cidr1.first <= cidr0.last
+
+def nombreasn(CONFIG,numero):
+    """ Returns the owner name of an ASN """
+    try:
+        with open(CONFIG['json_dir']+numero+'.json','r') as j:
+            datos=json.load(j)
+            owner=datos['entities'][0]['vcardArray'][1][5][3][0].encode('utf-8').title()
+            return ' ('+owner+') '
+    except:
+        return ' () ' #TODO Maybe needs a query in RDAP?
