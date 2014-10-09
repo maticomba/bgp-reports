@@ -28,6 +28,7 @@ if __name__ == "__main__":
     CONFIG['rpt_dir']='reportes/'
     CONFIG['tmp_dir']='workdir/' # Temporal directory for internal reports
     CONFIG['htmli_dir']='htmlincludes/'
+    CONFIG['webreport_dir']='html/'
     
     # These are countries for which you have the IXP routing table
     CONFIG['countries_to_report']=['AR','CL']

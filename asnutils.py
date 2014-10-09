@@ -298,7 +298,7 @@ def convert_to_asdot(asnumber):
 def find_rir_by_asn(CONFIG,asnumber):
     """ Encuentra a que RIR hay que hacer la consulta de RDAP
         de acuerdo el numero de sistema autonomo de la clase """
-    reservados=[0,23456]
+    reservados=['0','23456']
     reservados.append(range(64512,65535))
     if asnumber in reservados:
         return 'SPECIAL'
@@ -384,37 +384,32 @@ def rdapwhois(CONFIG,ASNs):
     
     for asn in ASNs:
         # Busco a que rir pertenece el AS
+        url=CONFIG['rdap_RIPENCC']+str(asn)
         if (asn != '0'):
             rir=find_rir_by_asn(CONFIG,asn)
         
         if (rir == 'SPECIAL'):
+            next  
+        elif (rir == 'NOTFOUND'):
+            next        
+        elif rir == 'ARIN':
+            url=str(CONFIG['rdap_ARIN']+str(asn))
+        elif rir == 'RIPENCC':
+            url=str(CONFIG['rdap_RIPENCC']+str(asn))
+        elif rir == 'APNIC':
+            url=str(CONFIG['rdap_APNIC']+str(asn))
+        elif rir == 'LACNIC':
+            url=str(CONFIG['rdap_LACNIC']+str(asn))
+        elif rir == 'AFRINIC':
+            url=str(CONFIG['rdap_AFRINIC']+str(asn))
+        else:
+            print('No hay informacion de servidor RDAP para el AS'+str(asn)+' en el RIR: '+rir)
             next
-            
-        if (rir == 'NOTFOUND'):
-            next
-        
-        try: # TODO: Tuve que meter esto en un try porque fallaba cuando lo llamaba desde nombreasn()
-            if rir == 'ARIN':
-                url=str(CONFIG['rdap_ARIN']+str(asn))
-            elif rir == 'RIPENCC':
-                url=str(CONFIG['rdap_RIPENCC']+str(asn))
-            elif rir == 'APNIC':
-                url=str(CONFIG['rdap_APNIC']+str(asn))
-            elif rir == 'LACNIC':
-                url=str(CONFIG['rdap_LACNIC']+str(asn))
-            elif rir == 'AFRINIC':
-                url=str(CONFIG['rdap_AFRINIC']+str(asn))
-            else:
-                print('No hay informacion de servidor RDAP para el AS'+str(asn)+' en el RIR: '+rir)
-                next
     
 #            if (not CONFIG['rdap_'+rir.upper()]):
 #                print('No hay informacion de servidor RDAP para el RIR: '+rir)
 #                return
 #            url=str(CONFIG['rdap_'+rir]+str(asn))
-        except:
-            next
-        
         archivo=cachedir+str(asn)+'.json'
         
         try:            
@@ -449,8 +444,10 @@ def rdapwhois(CONFIG,ASNs):
         except Exception as e:
                 print('Error: '+str(e))
 
-    if (len(RDAP404) > 0):
-        print('Se encontraron errores en las consultas RDAP para los siguientes ASNs:'+str(RDAP404)+"\n")
+#    if (len(RDAP404) > 0):
+#        print('\nSe encontraron errores en las consultas RDAP para los siguientes ASNs:')
+#	for asnumber in RDAP404:
+#		print('\t--> AS'+str(asnumber))
     return(DatosWHOIS)
     
 def update_feeds(CONFIG):
@@ -555,7 +552,7 @@ def report_missing_asns(CONFIG,PAIS):
         nombre=nombreasn(CONFIG,carrier)
         print('\t--> AS'+str(carrier)+nombre)
         
-    print('\nCantidad de ASNs que estan en el IXP de '+str(PAIS)+' y no anuncian a todos los ASN: '+str(len(ProveedoresQueNoAnuncianUnASN.keys()))+'\n')
+    print('\nCantidad de ASNs que estan en el IXP de '+str(PAIS)+' y no anuncian a todos los clientes: '+str(len(ProveedoresQueNoAnuncianUnASN.keys()))+'\n')
     for isp in ProveedoresQueNoAnuncianUnASN.keys():
         nombre=nombreasn(CONFIG,isp)
         print('\nEl AS'+str(isp)+nombre+' no esta anunciando los siguientes ASNs en el IXP de '+str(PAIS)+': ')
@@ -581,6 +578,8 @@ def report_missing_asns(CONFIG,PAIS):
             with open(CONFIG['json_dir']+faltante+'.json','r') as j:
                 jdata = json.load(j)
                 print('\t --> AS'+faltante+' '+jdata['entities'][0]['vcardArray'][1][5][3][0].encode('utf-8'))
+                print('\t\t Ciudad: '+jdata['entities'][0]['vcardArray'][1][2][3][3].encode('utf-8')+', '+jdata['entities'][0]['vcardArray'][1][2][3][4].encode('utf-8')+' - '+jdata['entities'][0]['vcardArray'][1][2][3][6].encode('utf-8'))
+                print('\t\t Telefono: '+jdata['entities'][0]['vcardArray'][1][4][3].encode('utf-8'))
                 print('\t\t Tecnico: '+jdata['entities'][2]['vcardArray'][1][1][3].encode('utf-8'))
                 print('\t\t Email: <'+jdata['entities'][2]['vcardArray'][1][3][3].lower()+'>')
         except IOError as e:
@@ -713,4 +712,8 @@ def nombreasn(CONFIG,numero):
             owner=datos['entities'][0]['vcardArray'][1][5][3][0].encode('utf-8').title()
             return ' ('+owner+') '
     except:
+        rdapwhois(CONFIG,[numero])
         return ' () ' #TODO Maybe needs a query in RDAP?
+
+def checkrequiredfiles(CONFIG):
+	pass	
