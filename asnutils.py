@@ -1,3 +1,4 @@
+import os.path
 #! /usr/bin/env python
 
 # This file is part of bgp-reports.
@@ -222,9 +223,6 @@ def generate_ixp_report(CONFIG,PAIS):
     try:
         with open(CONFIG['tmp_dir']+"RPT_Dict_RIR",'w') as f:
             f.write(repr(pais_ASNs))
-    except IOError as e:
-        print('Error en el archivo: '+str(e))
-    try:
         with open(CONFIG['tmp_dir']+"RPT_Dict_AS",'w') as f:
             f.write(repr(ASNpais))
     except IOError as e:
@@ -253,9 +251,6 @@ def generate_ixp_report(CONFIG,PAIS):
         try:
             with open(CONFIG['tmp_dir']+"RPT_ASNs_"+PAIS+"_"+BGPIXP,'w') as f:
                 f.write(repr(InterseccionAS[ctry]))
-        except IOError as e:
-            print('Error en el archivo: '+str(e))
-        try:
             with open(CONFIG['tmp_dir']+"RPT_Links_"+PAIS+"_"+BGPIXP,'w') as f:
                 f.write(repr(LinksIXP))
         except IOError as e:
@@ -298,17 +293,21 @@ def convert_to_asdot(asnumber):
 def find_rir_by_asn(CONFIG,asnumber):
     """ Encuentra a que RIR hay que hacer la consulta de RDAP
         de acuerdo el numero de sistema autonomo de la clase """
-    reservados=['0','23456']
-    reservados.append(range(64512,65535))
-    if asnumber in reservados:
+    reservados=[0,23456]
+    reservados.extend(range(64512,65535))
+    if int(asnumber) in reservados:
         return 'SPECIAL'
-    with open(CONFIG['tabla_asn_json'], 'r') as archivo:
-        data = json.load(archivo)
-        if(data[asnumber]=='RIPE NCC'):
-            return 'RIPENCC'
-        elif(data[asnumber])=='':
-            return 'NOTFOUND'
-        return (data[asnumber])
+    else:
+        try:
+            with open(CONFIG['tabla_asn_json'], 'r') as archivo:
+                data = json.load(archivo)
+                if(data[asnumber]=='RIPE NCC'):
+                    return 'RIPENCC'
+                elif(data[asnumber])=='':
+                    return 'NOTFOUND'
+                return (data[asnumber])
+        except Exception as e:
+            pass
 
 def find_rir_by_country(CONFIG,country):
     """ [TODO] Devuelve el nombre del RIR que atiende a un pais determinado """
@@ -403,7 +402,7 @@ def rdapwhois(CONFIG,ASNs):
         elif rir == 'AFRINIC':
             url=str(CONFIG['rdap_AFRINIC']+str(asn))
         else:
-            print('No hay informacion de servidor RDAP para el AS'+str(asn)+' en el RIR: '+rir)
+            print('No hay informacion de servidor RDAP para el AS'+str(asn)+' en el RIR: '+str(rir))
             next
     
 #            if (not CONFIG['rdap_'+rir.upper()]):
@@ -717,3 +716,89 @@ def nombreasn(CONFIG,numero):
 
 def checkrequiredfiles(CONFIG):
 	pass	
+
+def make_asn_graphs(CONFIG,pais):
+        output =CONFIG['webreport_dir']+'data/ixp-'+pais+'/'
+        PathASNsIXP = CONFIG['tmp_dir']+'asnsixp-'+pais+'.txt'
+        PathLinksASNsIXP = CONFIG['tmp_dir']+'RPT_Links_'+pais+'_bgp-ixp-'+pais
+
+        ### Traigo todos los asn de un IXP
+        ASNsIXP=set()
+        f=open(PathASNsIXP,"r")
+        ASNsIXP=eval(f.read())
+
+        ### Traigo todos los links de un IXP
+        LinksASNsIXP=set()
+        f=open(PathLinksASNsIXP,"r")
+        LinksASNsIXP=eval(f.read())
+
+        dictLinks = dict()
+        listaLinks=list(dict())
+        
+        ### Armo los depends para el grafo, a cada AS le corresponde un set de depends
+        for link in LinksASNsIXP:
+            depends,sp,asOrigen=link.partition(",")      
+
+            if asOrigen in dictLinks.keys():
+                dictLinks[asOrigen] |= {'AS'+depends}
+            else:
+                dictLinks[asOrigen] = {'AS'+depends}
+
+        print('Cantidad de nodos: ' + str(len(dictLinks)))
+
+        ### Armo el listado con el formato requerido por la aplicacion
+        for asn,links in dictLinks.iteritems():
+            if len(links) > 0:
+                listaLinks += [{"depends":list(links),"type":"1","name":'AS'+asn}]
+        try:
+            listaLinks.remove({"depends":["AS0"],"type":"1","name":"AS52324"})                        
+        
+        except Exception as e:
+            pass
+            #print(str(e))
+        
+        #TODO ver lo del as desde cual se toma el archivo, para ponerlo en la lista como {"depends":[],"type":"1","name":"AS52324"} o {"depends":[],"type":"1","name":"AS19411"} 
+        if pais == 'AR':
+            listaLinks += [{"depends":[],"type":"1","name":"AS52324"}]
+        elif pais == 'CL':
+            listaLinks += [{"depends":[],"type":"1","name":"AS19411"}]
+
+        ### Creo el json para la aplicacion
+        if not os.path.exists(output):
+            os.makedirs(output)
+        with open(output + 'objects.json','w') as j:
+            j.write(json.dumps(listaLinks))
+
+def make_mkdn_files(CONFIG):   
+    for file in os.listdir(CONFIG['json_dir']):    
+        try:
+            with open(CONFIG['json_dir'] + '/' + file,'r') as j:
+                jdata=json.load(j)
+                asn,sp,extension=file.partition('.')
+
+                info_html = '<ul><li>Nombre: '+jdata['entities'][0]['vcardArray'][1][5][3][0]+'<br /></li>'
+                info_html += '<li>Ciudad: '+jdata['entities'][0]['vcardArray'][1][2][3][3]+', '+jdata['entities'][0]['vcardArray'][1][2][3][4]+' - '+jdata['entities'][0]['vcardArray'][1][2][3][6]+'<br /></li>'
+                info_html += '<li>Telefono: '+jdata['entities'][0]['vcardArray'][1][4][3]+'<br /></li>'
+                info_html += '<li>Tecnico: '+jdata['entities'][2]['vcardArray'][1][1][3]+'<br /></li>'
+                info_html += '<li>Email: <'+jdata['entities'][2]['vcardArray'][1][3][3].lower()+'>'+'<br /></li></ul>'
+
+            for pais in CONFIG['countries_to_report']:
+                output =CONFIG['webreport_dir']+'data/ixp-'+pais+'/'
+                if not os.path.exists(output):
+                    os.makedirs(output)
+                with open(output + 'AS' + asn + '.mkdn','w') as j:
+                    j.write(info_html.encode('utf-8'))
+                
+                with open('config.json','r') as j:
+                    with open(output + 'config.json','w') as r:
+                        r.write(j.read())
+                        
+        except ValueError as e:
+#            print('ValueError: ' + str(e) + ' AS' + asn)
+            continue
+        except KeyError as e:
+#            print('KeyError: ' + str(e) + ' AS' + asn)
+            continue
+        except Exception as e:
+#            print('Error: ' + str(e))
+            continue

@@ -23,15 +23,15 @@ if __name__ == "__main__":
 # Main configuration
     CONFIG=dict()
     CONFIG['feed_dir']='feeds/' # Where to put the downloaded routing tables and rir assignments
-    CONFIG['feed_ttl']=3600*24*7 #Seconds needed to download all the feeds again
+    CONFIG['feed_ttl']=3600*24*31 #Seconds needed to download all the feeds again
     CONFIG['json_dir']='cache/'
     CONFIG['rpt_dir']='reportes/'
     CONFIG['tmp_dir']='workdir/' # Temporal directory for internal reports
     CONFIG['htmli_dir']='htmlincludes/'
-    CONFIG['webreport_dir']='html/'
+    CONFIG['webreport_dir']='webgraphs/'
     
     # These are countries for which you have the IXP routing table
-    CONFIG['countries_to_report']=['AR','CL']
+    CONFIG['countries_to_report']=['AR','CL','BR']
     
     # BGP Global table file, there are two formats available. MRT is the smaller one.
     CONFIG['tabla_mundial']='full-routing-cisco.txt'
@@ -74,6 +74,9 @@ if __name__ == "__main__":
         asnutils.generate_ixp_report(CONFIG,PAIS)
         asnutils.generar_reporte_pais(CONFIG,PAIS)
         asnutils.report_missing_asns(CONFIG,PAIS)
+        asnutils.make_asn_graphs(CONFIG,PAIS)
         
+    asnutils.make_mkdn_files(CONFIG)
+    
     print"\nHave a nice day"
     exit
