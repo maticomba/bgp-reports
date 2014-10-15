@@ -25,12 +25,13 @@ if __name__ == "__main__":
     CONFIG['feed_dir']='feeds/' # Where to put the downloaded routing tables and rir assignments
     CONFIG['feed_ttl']=3600*24*31 #Seconds needed to download all the feeds again
     CONFIG['json_dir']='cache/'
-    CONFIG['rpt_dir']='reportes/'
     CONFIG['tmp_dir']='workdir/' # Temporal directory for internal reports
     CONFIG['webreport_dir']='webgraphs/'
     
     # These are countries for which you have the IXP routing table
-    CONFIG['countries_to_report']=['AR','CL','BR']
+    #CONFIG['countries_to_report']=['AR','BR','CL','CO']
+    CONFIG['countries_to_report']=['AR','CL','CO','BR']
+#    CONFIG['countries_to_report']=['BR']
     
     # BGP Global table file, there are two formats available. MRT is the smaller one.
     CONFIG['tabla_mundial']='full-routing-cisco.txt'

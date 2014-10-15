@@ -1,4 +1,3 @@
-import os.path
 #! /usr/bin/env python
 
 # This file is part of bgp-reports.
@@ -213,10 +212,9 @@ def parse_asn_rir(CONFIG):
                 
     
 def generate_ixp_report(CONFIG,PAIS):
-    HTML_IN_1=CONFIG['htmli_dir']+'header.html'
-    HTML_IN_2=CONFIG['htmli_dir']+'footer.html'
     print("\n====== Reporte de "+PAIS+" ======\n")
-    BGPIXP='bgp-ixp-'+PAIS
+    #ArchivoTablaIXP='bgp-ixp-'+PAIS+'.txt'
+    ArchivoTablaIXP='bgp-ixp-'+PAIS
     
     #TODO Review and fix this
     [pais_ASNs,ASNpais]=make_asn_pais(CONFIG['deleg_lacnic'])
@@ -228,9 +226,9 @@ def generate_ixp_report(CONFIG,PAIS):
     except IOError as e:
         print('Error en el archivo: '+str(e))
    
-    [ASNsIXP,LinksIXP] = make_asn_links(CONFIG['feed_dir']+BGPIXP)
-    print ("Cantidad de ASNs en "+BGPIXP+": "+str(len(ASNsIXP)))
-    print ("Cantidad de Links en "+BGPIXP+": "+str(len(LinksIXP)))
+    [ASNsIXP,LinksIXP] = make_asn_links(CONFIG['feed_dir']+ArchivoTablaIXP)
+    print ("Cantidad de ASNs en "+ArchivoTablaIXP+": "+str(len(ASNsIXP)))
+    print ("Cantidad de Links en "+ArchivoTablaIXP+": "+str(len(LinksIXP)))
     
     try:
         with open(CONFIG['tmp_dir']+'asnsixp-'+PAIS+'.txt','w') as f:
@@ -246,12 +244,12 @@ def generate_ixp_report(CONFIG,PAIS):
         InterseccionAS[ctry]=pais_ASNs[ctry] & ASNsIXP
                         
         if len(InterseccionAS[ctry]) > 0:
-            print("Cantidad de ASN's de "+str(ctry)+" en el archivo "+str(BGPIXP)+": "+str(len(InterseccionAS[ctry])))
+            print("Cantidad de ASN's de "+str(ctry)+" en el archivo "+str(ArchivoTablaIXP)+": "+str(len(InterseccionAS[ctry])))
     
         try:
-            with open(CONFIG['tmp_dir']+"RPT_ASNs_"+PAIS+"_"+BGPIXP,'w') as f:
+            with open(CONFIG['tmp_dir']+"RPT_ASNs_"+PAIS+"_"+ArchivoTablaIXP,'w') as f:
                 f.write(repr(InterseccionAS[ctry]))
-            with open(CONFIG['tmp_dir']+"RPT_Links_"+PAIS+"_"+BGPIXP,'w') as f:
+            with open(CONFIG['tmp_dir']+"RPT_Links_"+PAIS+"_"+ArchivoTablaIXP,'w') as f:
                 f.write(repr(LinksIXP))
         except IOError as e:
             print('Error en el archivo: '+str(e))
@@ -363,11 +361,11 @@ def make_asn_links(bgpdump):
     dumptype = ribtype(bgpdump)
     
     if (dumptype == 'cisco'):
-        ListaASNs,ListaLinks = parseCisco(bgpdump)
+        ListaASNs,ListaLinks = parseCisco(bgpdump)   
         
     if (dumptype == 'mrt'):
         ListaASNs,ListaLinks = parseMRT(bgpdump)
-    
+        
     return([set(ListaASNs), set(ListaLinks)])
 
 def rdapwhois(CONFIG,ASNs):
@@ -627,7 +625,7 @@ def parseCisco(bgpfile):
                     break
                     
         for linea in dumplines:
-            if(re.search(r'^\*\>?.*[i\?]$',linea)):
+            if(re.search(r'^.*(i|\?)$',linea)):
                 aspath=linea[offset:-2]
                 asns = aspath.split()
                 lastasn=0
@@ -675,9 +673,9 @@ def ribtype(archivo):
                     return 'cisco'
                 if(mhits >= minhits):
                     return 'mrt'
-                if(re.search(r'^\*.*(i|\?)$',linea)):
+                if(re.search(r'^.*(i|\?)$',linea)):
                     chits+=1
-                if(re.search(r'^TYPE.*PREFIX.*ASPATH:.*',linea)):
+                if(re.search(r'^.*ASPATH:.*',linea)):
                     mhits+=1
                 if(lin>minhits*4):
                     return False
@@ -722,6 +720,7 @@ def make_asn_graphs(CONFIG,pais):
         PathASNsIXP = CONFIG['tmp_dir']+'asnsixp-'+pais+'.txt'
         PathLinksASNsIXP = CONFIG['tmp_dir']+'RPT_Links_'+pais+'_bgp-ixp-'+pais
 
+        print("\n==== Generando datos para el grafo de "+pais+" ====")
         ### Traigo todos los asn de un IXP
         ASNsIXP=set()
         f=open(PathASNsIXP,"r")
@@ -744,7 +743,7 @@ def make_asn_graphs(CONFIG,pais):
             else:
                 dictLinks[asOrigen] = {'AS'+depends}
 
-        print('Cantidad de nodos: ' + str(len(dictLinks)))
+        print('---> Cantidad de nodos: ' + str(len(dictLinks)))
 
         ### Armo el listado con el formato requerido por la aplicacion
         for asn,links in dictLinks.iteritems():
@@ -762,6 +761,8 @@ def make_asn_graphs(CONFIG,pais):
             listaLinks += [{"depends":[],"type":"1","name":"AS52324"}]
         elif pais == 'CL':
             listaLinks += [{"depends":[],"type":"1","name":"AS19411"}]
+        elif pais == 'CO':
+            listaLinks += [{"depends":[],"type":"1","name":"AS18747"}]
 
         ### Creo el json para la aplicacion
         if not os.path.exists(output):
@@ -770,28 +771,33 @@ def make_asn_graphs(CONFIG,pais):
             j.write(json.dumps(listaLinks))
 
 def make_mkdn_files(CONFIG):   
-    for file in os.listdir(CONFIG['json_dir']):    
-        try:
-            with open(CONFIG['json_dir'] + '/' + file,'r') as j:
-                jdata=json.load(j)
-                asn,sp,extension=file.partition('.')
-
-                info_html = '<ul><li>Nombre: '+jdata['entities'][0]['vcardArray'][1][5][3][0]+'<br /></li>'
-                info_html += '<li>Ciudad: '+jdata['entities'][0]['vcardArray'][1][2][3][3]+', '+jdata['entities'][0]['vcardArray'][1][2][3][4]+' - '+jdata['entities'][0]['vcardArray'][1][2][3][6]+'<br /></li>'
-                info_html += '<li>Telefono: '+jdata['entities'][0]['vcardArray'][1][4][3]+'<br /></li>'
-                info_html += '<li>Tecnico: '+jdata['entities'][2]['vcardArray'][1][1][3]+'<br /></li>'
-                info_html += '<li>Email: <'+jdata['entities'][2]['vcardArray'][1][3][3].lower()+'>'+'<br /></li></ul>'
-
+    print("\n==== Generando datos de whois para los grafos ====")
+    for file in os.listdir(CONFIG['json_dir']):
+        try:            
             for pais in CONFIG['countries_to_report']:
                 output =CONFIG['webreport_dir']+'data/ixp-'+pais+'/'
                 if not os.path.exists(output):
                     os.makedirs(output)
-                with open(output + 'AS' + asn + '.mkdn','w') as j:
-                    j.write(info_html.encode('utf-8'))
                 
-                with open('config.json','r') as j:
-                    with open(output + 'config.json','w') as r:
-                        r.write(j.read())
+                asn,sp,extension=file.partition('.')
+                
+                if not os.path.isfile(output + 'AS' + asn + '.mkdn'):
+                    with open(CONFIG['json_dir'] + '/' + file,'r') as j:
+                        jdata=json.load(j)                      
+
+                        info_html = '<ul><li>Nombre: '+jdata['entities'][0]['vcardArray'][1][5][3][0]+'<br /></li>'
+                        info_html += '<li>Ciudad: '+jdata['entities'][0]['vcardArray'][1][2][3][3]+', '+jdata['entities'][0]['vcardArray'][1][2][3][4]+' - '+jdata['entities'][0]['vcardArray'][1][2][3][6]+'<br /></li>'
+                        info_html += '<li>Telefono: '+jdata['entities'][0]['vcardArray'][1][4][3]+'<br /></li>'
+                        info_html += '<li>Tecnico: '+jdata['entities'][2]['vcardArray'][1][1][3]+'<br /></li>'
+                        info_html += '<li>Email: '+jdata['entities'][2]['vcardArray'][1][3][3].lower()+'<br /></li></ul>'
+                    
+                    with open(output + 'AS' + asn + '.mkdn','w') as j:
+                        j.write(info_html.encode('utf-8'))
+                
+                if not os.path.isfile(output + 'config.json'):
+                    with open('config.json','r') as j:
+                        with open(output + 'config.json','w') as r:
+                            r.write(j.read())
                         
         except ValueError as e:
 #            print('ValueError: ' + str(e) + ' AS' + asn)
